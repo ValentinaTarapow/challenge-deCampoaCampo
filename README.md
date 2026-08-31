@@ -37,7 +37,7 @@ El detalle **no** tapa la tab bar: podés saltar a Favorites sin volver a la lis
 ## Funciones
 
 - **Lista** — grilla de 3, infinite scroll (`limit`/`offset`), pull to refresh.
-- **Search** — filtro en tiempo real por nombre o `#id` sobre un catálogo de nombres.
+- **Search** — filtro en tiempo real por nombre o `#id` sobre un catálogo de nombres. Mega, gmax y caps no aparecen; las formas regionales sí, con el filtro de región.
 - **Filter** — sheet por región, generación y tipo (se pueden combinar). Chips activos para sacar uno o limpiar todo.
 - **Detalle** — types, stats, matchups, evoluciones, forms, abilities, shiny, generación.
 - **Shiny** — en el detalle, el botón de estrella cambia el artwork (también en evoluciones y forms).

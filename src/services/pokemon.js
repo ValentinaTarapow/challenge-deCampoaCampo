@@ -129,6 +129,12 @@ export function getPokemonIdFromUrl(url) {
   return parts[parts.length - 1];
 }
 
+const VARIETY_ID_START = 10000;
+
+export function isDefaultPokemon(item) {
+  return Number(item?.id) < VARIETY_ID_START;
+}
+
 export function getPokemonSpriteUrl(id, { shiny = false } = {}) {
   const path = shiny ? `shiny/${id}` : id;
   return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${path}.png`;

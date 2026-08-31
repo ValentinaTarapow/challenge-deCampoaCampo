@@ -21,6 +21,7 @@ import {
   getPokemonNamesByRegion,
   getPokemonNamesByType,
   getPokemonSpriteUrl,
+  isDefaultPokemon,
   pokemonNamesForRegions,
 } from '../services/pokemon';
 import {
@@ -172,9 +173,12 @@ export default function HomeScreen({ navigation }) {
   const fetchPage = useCallback(
     async ({ nextOffset = 0, append = false } = {}) => {
       const data = await getPokemonList(PAGE_SIZE, nextOffset);
-      const mapped = mapResults(data.results);
+      const mapped = mapResults(data.results).filter(isDefaultPokemon);
       const nextOffsetValue = nextOffset + PAGE_SIZE;
-      const hasMorePages = Boolean(data.next);
+      const reachedVarieties = (data.results ?? []).some(
+        (item) => !isDefaultPokemon({ id: getPokemonIdFromUrl(item.url) }),
+      );
+      const hasMorePages = Boolean(data.next) && !reachedVarieties;
 
       let nextList;
       if (!append) {
@@ -346,7 +350,7 @@ export default function HomeScreen({ navigation }) {
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term && !hasFilters) return pokemon;
+    if (!term && !hasFilters) return pokemon.filter(isDefaultPokemon);
     const source = catalog.length ? catalog : pokemon;
     const regionNames = activeSets?.regions
       ? pokemonNamesForRegions(activeSets.regions, catalogNames)
@@ -354,6 +358,7 @@ export default function HomeScreen({ navigation }) {
     return source.filter((item) => {
       if (activeSets?.type && !activeSets.type.has(item.name)) return false;
       if (regionNames && !regionNames.has(item.name)) return false;
+      if (!isDefaultPokemon(item) && !regionNames?.has(item.name)) return false;
       if (term && !matchesSearch(item, term)) return false;
       return true;
     });

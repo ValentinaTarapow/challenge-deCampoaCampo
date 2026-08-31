@@ -11,6 +11,7 @@ import {
   parseEvolutionStages,
   parseVarieties,
   pokemonNamesForRegions,
+  isDefaultPokemon,
 } from './pokemon';
 
 jest.mock('./client', () => ({
@@ -22,6 +23,13 @@ describe('pokemon helpers', () => {
     expect(
       getPokemonIdFromUrl('https://pokeapi.co/api/v2/pokemon/25/'),
     ).toBe('25');
+  });
+
+  it('treats national dex entries as default and 10000+ ids as extra forms', () => {
+    expect(isDefaultPokemon({ id: 25 })).toBe(true);
+    expect(isDefaultPokemon({ id: '474' })).toBe(true);
+    expect(isDefaultPokemon({ id: 10091 })).toBe(false);
+    expect(isDefaultPokemon({ id: '10194' })).toBe(false);
   });
 
   it('builds sprite and artwork urls', () => {
