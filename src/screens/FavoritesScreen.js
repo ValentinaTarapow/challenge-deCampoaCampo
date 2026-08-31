@@ -6,9 +6,10 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PokemonGridItem } from '../components/PokemonGridItem';
+import { PokemonGridSkeleton } from '../components/Skeleton';
 import { Screen } from '../components/Screen';
+import { EmptyState } from '../components/states';
 import { useFavorites } from '../context/FavoritesContext';
 import { colors } from '../theme/colors';
 
@@ -18,27 +19,11 @@ const GRID_GAP = 10;
 
 const keyExtractor = (item) => String(item.id);
 
-function EmptyFavorites() {
-  return (
-    <View style={styles.empty}>
-      <MaterialCommunityIcons
-        name="heart-outline"
-        size={40}
-        color={colors.textMuted}
-      />
-      <Text style={styles.emptyTitle}>No favorites yet</Text>
-      <Text style={styles.emptyText}>
-        Tap the heart on a Pokémon to save it here. Favorites stay available offline.
-      </Text>
-    </View>
-  );
-}
-
 export default function FavoritesScreen({ navigation }) {
   const { width } = useWindowDimensions();
   const cardWidth =
     (width - LIST_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
-  const { favorites } = useFavorites();
+  const { favorites, ready } = useFavorites();
 
   const onPressPokemon = useCallback(
     (item) => {
@@ -58,24 +43,42 @@ export default function FavoritesScreen({ navigation }) {
     [cardWidth, onPressPokemon],
   );
 
+  const listData = ready ? favorites : [];
+
   return (
     <Screen>
       <View style={styles.header}>
         <Text style={styles.title}>Favorites</Text>
         <Text style={styles.subtitle}>
-          {favorites.length
-            ? `${favorites.length} saved · available offline`
-            : 'Your saved Pokémon'}
+          {!ready
+            ? 'Loading your saved Pokémon...'
+            : favorites.length
+              ? `${favorites.length} saved · available offline`
+              : 'Your saved Pokémon'}
         </Text>
       </View>
       <FlatList
-        data={favorites}
+        data={listData}
         numColumns={NUM_COLUMNS}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
-        columnWrapperStyle={favorites.length ? styles.row : undefined}
-        ListEmptyComponent={EmptyFavorites}
+        style={styles.list}
+        contentContainerStyle={[
+          styles.listContent,
+          listData.length === 0 && styles.listContentEmpty,
+        ]}
+        columnWrapperStyle={listData.length ? styles.row : undefined}
+        ListEmptyComponent={
+          ready ? (
+            <EmptyState
+              icon="heart-outline"
+              title="No favorites yet"
+              message="Tap the heart on a Pokémon to save it here. Favorites stay available offline."
+            />
+          ) : (
+            <PokemonGridSkeleton cardWidth={cardWidth} />
+          )
+        }
       />
     </Screen>
   );
@@ -99,29 +102,18 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   list: {
+    flex: 1,
+  },
+  listContent: {
     paddingHorizontal: LIST_PADDING,
     paddingBottom: 32,
     flexGrow: 1,
   },
+  listContentEmpty: {
+    justifyContent: 'center',
+  },
   row: {
     gap: GRID_GAP,
     marginBottom: GRID_GAP,
-  },
-  empty: {
-    alignItems: 'center',
-    marginTop: 48,
-    paddingHorizontal: 32,
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  emptyText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.textMuted,
-    textAlign: 'center',
   },
 });

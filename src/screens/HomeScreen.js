@@ -30,8 +30,9 @@ import {
 } from '../services/storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PokemonGridItem } from '../components/PokemonGridItem';
+import { PokemonGridSkeleton } from '../components/Skeleton';
 import { Screen } from '../components/Screen';
-import { LoadingState, ErrorState } from '../components/states';
+import { ErrorState } from '../components/states';
 import {
   EMPTY_FILTERS,
   FilterSheet,
@@ -39,6 +40,7 @@ import {
   createEmptyFilters,
   normalizeFilters,
 } from '../components/FilterSheet';
+import { describeError } from '../services/errors';
 import { colors } from '../theme/colors';
 
 const PAGE_SIZE = 24;
@@ -48,13 +50,17 @@ const GRID_GAP = 10;
 
 const keyExtractor = (item) => String(item.id);
 
-function ListEmpty({ searching, filtering }) {
+function ListEmpty({ query, searching, filtering }) {
+  const term = query.trim();
   const message =
     searching && filtering
-      ? 'Pokémon not found with those filters.'
+      ? `No Pokémon match “${term}” with those filters.`
       : filtering
-        ? 'No Pokémon match those filters.'
-        : 'Pokémon not found. Try another name or #id.';
+        ? 'No Pokémon match those filters. Try removing a region or type.'
+        : searching
+          ? `No Pokémon match “${term}”. Try another name or #id.`
+          : 'There are no Pokémon to show right now.';
+
   return (
     <View style={styles.empty}>
       <Image
@@ -106,8 +112,9 @@ function matchesSearch(item, term) {
 function LoadMoreFooter({ loading, error, onRetry }) {
   if (loading) {
     return (
-      <View style={styles.footer}>
+      <View style={styles.footer} accessibilityRole="progressbar">
         <ActivityIndicator color={colors.primary} />
+        <Text style={styles.footerHint}>Loading more Pokémon...</Text>
       </View>
     );
   }
@@ -115,12 +122,13 @@ function LoadMoreFooter({ loading, error, onRetry }) {
   if (!error) return null;
 
   return (
-    <View style={styles.footer}>
-      <Text style={styles.footerError}>{error}</Text>
-      <Pressable onPress={onRetry} style={styles.footerRetry}>
-        <Text style={styles.footerRetryText}>Retry</Text>
-      </Pressable>
-    </View>
+    <ErrorState
+      compact
+      kind={error.kind}
+      title={error.title}
+      message={error.message}
+      onRetry={onRetry}
+    />
   );
 }
 
@@ -231,7 +239,7 @@ export default function HomeScreen({ navigation }) {
       setFromCache(false);
     } catch (err) {
       if (!hasCache) {
-        setError(err.message || 'Could not load the list');
+        setError(describeError(err, 'list'));
       }
     } finally {
       setLoading(false);
@@ -257,7 +265,7 @@ export default function HomeScreen({ navigation }) {
       loadCatalog().catch(() => {});
     } catch (err) {
       if (pokemon.length === 0) {
-        setError(err.message || 'Could not refresh');
+        setError(describeError(err, 'list'));
       } else {
         setFromCache(true);
       }
@@ -294,7 +302,7 @@ export default function HomeScreen({ navigation }) {
       } catch (err) {
         if (!cancelled) {
           setFilterSets(null);
-          setFilterError(err.message || 'Could not load filters');
+          setFilterError(describeError(err, 'filters'));
         }
       } finally {
         if (!cancelled) setFilterLoading(false);
@@ -317,7 +325,7 @@ export default function HomeScreen({ navigation }) {
       setLoadMoreError(null);
       await fetchPage({ nextOffset: offsetRef.current, append: true });
     } catch (err) {
-      setLoadMoreError(err.message || 'Could not load more');
+      setLoadMoreError(describeError(err, 'loadMore'));
     } finally {
       loadingMoreRef.current = false;
       setLoadingMore(false);
@@ -343,11 +351,12 @@ export default function HomeScreen({ navigation }) {
     });
   }, [pokemon, catalog, query, hasFilters, activeSets]);
 
-  const waitingForCatalog = isFilteredView && catalog.length === 0;
-  const showFilterSpinner =
-    !filterError &&
-    ((hasFilters && (filterLoading || !activeSets)) || waitingForCatalog);
-  const listData = showFilterSpinner || filterError ? [] : filtered;
+  const showGridSkeleton =
+    loading ||
+    (!filterError && hasFilters && (filterLoading || !activeSets));
+  const listError = filterError || (error && pokemon.length === 0 ? error : null);
+  const listData = showGridSkeleton || listError ? [] : filtered;
+  const showEmpty = !showGridSkeleton && !listError && listData.length === 0;
 
   const onApplyFilters = useCallback((next) => {
     setFilters(normalizeFilters(next));
@@ -385,22 +394,6 @@ export default function HomeScreen({ navigation }) {
     ),
     [cardWidth, onPressPokemon],
   );
-
-  if (loading) {
-    return (
-      <Screen>
-        <LoadingState message="Loading Pokémon..." />
-      </Screen>
-    );
-  }
-
-  if (error && pokemon.length === 0) {
-    return (
-      <Screen>
-        <ErrorState message={error} onRetry={loadInitial} />
-      </Screen>
-    );
-  }
 
   return (
     <Screen>
@@ -513,51 +506,56 @@ export default function HomeScreen({ navigation }) {
             onClose={() => setFiltersOpen(false)}
           />
 
-          <FlatList
-            data={listData}
-            numColumns={NUM_COLUMNS}
-            keyExtractor={keyExtractor}
-            renderItem={renderItem}
-            contentContainerStyle={styles.list}
-            columnWrapperStyle={listData.length ? styles.row : undefined}
-            keyboardShouldPersistTaps="handled"
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            onEndReached={isFilteredView ? undefined : onEndReached}
-            onEndReachedThreshold={0.4}
-            initialNumToRender={12}
-            maxToRenderPerBatch={9}
-            removeClippedSubviews
-            ListEmptyComponent={
-              showFilterSpinner ? (
-                <View style={styles.listStatus}>
-                  <ActivityIndicator color={colors.primary} />
-                </View>
-              ) : filterError ? (
-                <View style={styles.listStatus}>
-                  <Text style={styles.footerError}>{filterError}</Text>
-                  <Pressable
-                    onPress={() => setFilterRetry((n) => n + 1)}
-                    style={styles.footerRetry}
-                  >
-                    <Text style={styles.footerRetryText}>Retry</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <ListEmpty searching={isSearching} filtering={hasFilters} />
-              )
-            }
-            ListFooterComponent={
-              isFilteredView ? null : (
-                <LoadMoreFooter
-                  loading={loadingMore}
-                  error={loadMoreError}
-                  onRetry={loadMore}
-                />
-              )
-            }
-          />
+          {showGridSkeleton ? (
+            <View style={styles.listPane}>
+              <PokemonGridSkeleton cardWidth={cardWidth} />
+            </View>
+          ) : listError ? (
+            <ErrorState
+              kind={listError.kind}
+              title={listError.title}
+              message={listError.message}
+              onRetry={
+                filterError
+                  ? () => setFilterRetry((n) => n + 1)
+                  : loadInitial
+              }
+            />
+          ) : showEmpty ? (
+            <ListEmpty
+              query={query}
+              searching={isSearching}
+              filtering={hasFilters}
+            />
+          ) : (
+            <FlatList
+              data={listData}
+              numColumns={NUM_COLUMNS}
+              keyExtractor={keyExtractor}
+              renderItem={renderItem}
+              style={styles.list}
+              contentContainerStyle={styles.listContent}
+              columnWrapperStyle={styles.row}
+              keyboardShouldPersistTaps="handled"
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              }
+              onEndReached={isFilteredView ? undefined : onEndReached}
+              onEndReachedThreshold={0.4}
+              initialNumToRender={12}
+              maxToRenderPerBatch={9}
+              removeClippedSubviews
+              ListFooterComponent={
+                isFilteredView ? null : (
+                  <LoadMoreFooter
+                    loading={loadingMore}
+                    error={loadMoreError}
+                    onRetry={loadMore}
+                  />
+                )
+              }
+            />
+          )}
     </Screen>
   );
 }
@@ -701,14 +699,16 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   list: {
+    flex: 1,
+  },
+  listPane: {
+    flex: 1,
+    paddingHorizontal: LIST_PADDING,
+  },
+  listContent: {
     paddingHorizontal: LIST_PADDING,
     paddingBottom: 32,
     flexGrow: 1,
-  },
-  listStatus: {
-    paddingVertical: 32,
-    alignItems: 'center',
-    gap: 10,
   },
   row: {
     gap: GRID_GAP,
@@ -719,33 +719,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  footerError: {
+  footerHint: {
     color: colors.textMuted,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  footerRetry: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  footerRetryText: {
-    color: '#fff',
-    fontWeight: '700',
     fontSize: 13,
+    fontWeight: '600',
   },
   empty: {
     flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
-    paddingTop: 36,
+    paddingBottom: 48,
     gap: 8,
   },
   emptyImage: {
-    width: 240,
-    height: 188,
+    width: 260,
+    height: 204,
     marginBottom: 4,
   },
   emptyTitle: {

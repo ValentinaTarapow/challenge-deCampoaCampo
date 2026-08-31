@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -14,7 +13,14 @@ import {
   getPokemonSpriteUrl,
 } from '../services/pokemon';
 import { getPokemonExtras } from '../services/pokemonDetail';
-import { LoadingState, ErrorState } from '../components/states';
+import { ErrorState } from '../components/states';
+import {
+  AbilityBlockSkeleton,
+  DetailScreenSkeleton,
+  EvolutionRowSkeleton,
+  TypeChipSkeleton,
+} from '../components/Skeleton';
+import { describeError } from '../services/errors';
 import { RemoteImage } from '../components/PokemonCard';
 import { TypeBadge } from '../components/TypeBadge';
 import { GenerationBadge } from '../components/GenerationBadge';
@@ -143,7 +149,19 @@ function IconTip({
   );
 }
 
-function MatchupSection({ title, tip, types, loaded, tipOpen, onToggleTip }) {
+function ExtraFallback({ loaded, skeleton, children }) {
+  if (loaded) return children;
+  return skeleton;
+}
+
+function MatchupSection({
+  title,
+  tip,
+  types,
+  loaded,
+  tipOpen,
+  onToggleTip,
+}) {
   return (
     <View style={[styles.section, tipOpen && styles.sectionRaised]}>
       <View style={styles.sectionHeader}>
@@ -160,11 +178,24 @@ function MatchupSection({ title, tip, types, loaded, tipOpen, onToggleTip }) {
           </Text>
         </IconTip>
       </View>
-      {loaded ? (
+      <ExtraFallback
+        loaded={loaded}
+        skeleton={
+          <View style={styles.wrapRow}>
+            <View style={styles.wrapItem}>
+              <TypeChipSkeleton />
+            </View>
+            <View style={styles.wrapItem}>
+              <TypeChipSkeleton />
+            </View>
+            <View style={styles.wrapItem}>
+              <TypeChipSkeleton />
+            </View>
+          </View>
+        }
+      >
         <TypeGroup types={types} />
-      ) : (
-        <ActivityIndicator color={colors.primary} />
-      )}
+      </ExtraFallback>
     </View>
   );
 }
@@ -335,7 +366,7 @@ function EvolutionStageNodes({ stage, currentName, onPress, shiny }) {
 
 function EvolutionSection({ stages, total, currentName, onPress, shiny }) {
   if (!stages) {
-    return <ActivityIndicator color={colors.primary} />;
+    return <EvolutionRowSkeleton />;
   }
 
   if (total <= 1) {
@@ -391,6 +422,8 @@ export default function DetailScreen({ route, navigation }) {
   const [abilities, setAbilities] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [extrasError, setExtrasError] = useState(null);
+  const [extrasRetry, setExtrasRetry] = useState(0);
   const [fromCache, setFromCache] = useState(false);
   const [showWeaknessTip, setShowWeaknessTip] = useState(false);
   const [showResistanceTip, setShowResistanceTip] = useState(false);
@@ -411,6 +444,7 @@ export default function DetailScreen({ route, navigation }) {
     const detail = cached?.detail;
 
     setError(null);
+    setExtrasError(null);
     setShowWeaknessTip(false);
     setShowResistanceTip(false);
     setShowFormsModal(false);
@@ -437,7 +471,7 @@ export default function DetailScreen({ route, navigation }) {
     } catch (err) {
       if (!detail?.pokemon) {
         setPokemon(null);
-        setError(err.message || 'Could not load details');
+        setError(describeError(err, 'detail', { query: nameOrId }));
       }
     } finally {
       setLoading(false);
@@ -500,6 +534,7 @@ export default function DetailScreen({ route, navigation }) {
 
     async function loadExtras() {
       try {
+        setExtrasError(null);
         const extras = await getPokemonExtras(pokemon);
         if (cancelled) return;
         setMatchups(extras.matchups);
@@ -507,12 +542,9 @@ export default function DetailScreen({ route, navigation }) {
         setVarieties(extras.varieties);
         setAbilities(extras.abilities);
         setEvolution(extras.evolution);
-      } catch {
+      } catch (err) {
         if (!cancelled) {
-          setMatchups((prev) => prev ?? { weaknesses: [], resistances: [] });
-          setEvolution((prev) => prev ?? { stages: [], linear: true, total: 0 });
-          setVarieties((prev) => prev ?? []);
-          setAbilities((prev) => prev ?? []);
+          setExtrasError(describeError(err, 'extras'));
         }
       }
     }
@@ -521,7 +553,7 @@ export default function DetailScreen({ route, navigation }) {
     return () => {
       cancelled = true;
     };
-  }, [pokemon]);
+  }, [pokemon, extrasRetry]);
 
   useEffect(() => {
     if (fromCache || !pokemon) return;
@@ -551,19 +583,31 @@ export default function DetailScreen({ route, navigation }) {
     [navigation],
   );
 
+  const retryExtras = () => setExtrasRetry((n) => n + 1);
+  const extrasFailed =
+    Boolean(extrasError) && !matchups && abilities == null && evolution == null;
+
   if (loading) {
     return (
       <View style={styles.container}>
-        <LoadingState message="Loading details..." />
+        <DetailScreenSkeleton />
         <SafeAreaView edges={['bottom']} style={styles.bottomSafe} />
       </View>
     );
   }
 
   if (error || !pokemon) {
+    const display =
+      error ||
+      describeError({ response: { status: 404 } }, 'detail', { query: nameOrId });
     return (
       <View style={styles.container}>
-        <ErrorState message={error || 'Not found'} onRetry={load} />
+        <ErrorState
+          kind={display.kind}
+          title={display.title}
+          message={display.message}
+          onRetry={load}
+        />
         <SafeAreaView edges={['bottom']} style={styles.bottomSafe} />
       </View>
     );
@@ -629,29 +673,43 @@ export default function DetailScreen({ route, navigation }) {
         </View>
       </View>
 
-      <MatchupSection
-        title="Weak to"
-        tip="These types deal extra damage. An attack of one of these types hits this Pokémon harder."
-        types={matchups?.weaknesses}
-        loaded={Boolean(matchups)}
-        tipOpen={showWeaknessTip}
-        onToggleTip={() => {
-          setShowResistanceTip(false);
-          setShowWeaknessTip((open) => !open);
-        }}
-      />
+      {extrasFailed ? (
+        <View style={styles.section}>
+          <ErrorState
+            compact
+            kind={extrasError.kind}
+            title={extrasError.title}
+            message={extrasError.message}
+            onRetry={retryExtras}
+          />
+        </View>
+      ) : (
+        <>
+          <MatchupSection
+            title="Weak to"
+            tip="These types deal extra damage. An attack of one of these types hits this Pokémon harder."
+            types={matchups?.weaknesses}
+            loaded={Boolean(matchups)}
+            tipOpen={showWeaknessTip}
+            onToggleTip={() => {
+              setShowResistanceTip(false);
+              setShowWeaknessTip((open) => !open);
+            }}
+          />
 
-      <MatchupSection
-        title="Resistant to"
-        tip="These types deal less damage. An attack of one of these types hits this Pokémon weaker."
-        types={matchups?.resistances}
-        loaded={Boolean(matchups)}
-        tipOpen={showResistanceTip}
-        onToggleTip={() => {
-          setShowWeaknessTip(false);
-          setShowResistanceTip((open) => !open);
-        }}
-      />
+          <MatchupSection
+            title="Resistant to"
+            tip="These types deal less damage. An attack of one of these types hits this Pokémon weaker."
+            types={matchups?.resistances}
+            loaded={Boolean(matchups)}
+            tipOpen={showResistanceTip}
+            onToggleTip={() => {
+              setShowWeaknessTip(false);
+              setShowResistanceTip((open) => !open);
+            }}
+          />
+        </>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Stats</Text>
@@ -666,36 +724,41 @@ export default function DetailScreen({ route, navigation }) {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Abilities</Text>
-        {abilities ? (
-          abilities.length ? (
-            abilities.map((ability) => (
-              <View key={ability.id} style={styles.abilityItem}>
-                <Text style={styles.abilityName}>{ability.name}</Text>
-                <Text style={styles.abilityText}>
-                  {ability.description || 'No description'}
-                </Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.meta}>None</Text>
-          )
-        ) : (
-          <ActivityIndicator color={colors.primary} />
-        )}
-      </View>
+      {extrasFailed ? null : (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Abilities</Text>
+          <ExtraFallback
+            loaded={abilities != null}
+            skeleton={<AbilityBlockSkeleton />}
+          >
+            {abilities?.length ? (
+              abilities.map((ability) => (
+                <View key={ability.id} style={styles.abilityItem}>
+                  <Text style={styles.abilityName}>{ability.name}</Text>
+                  <Text style={styles.abilityText}>
+                    {ability.description || 'No description'}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.meta}>None</Text>
+            )}
+          </ExtraFallback>
+        </View>
+      )}
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Evolutions</Text>
-        <EvolutionSection
-          stages={evolution?.stages}
-          total={evolution?.total}
-          currentName={pokemon.species?.name ?? pokemon.name}
-          onPress={openPokemon}
-          shiny={shiny}
-        />
-      </View>
+      {extrasFailed ? null : (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Evolutions</Text>
+          <EvolutionSection
+            stages={evolution?.stages}
+            total={evolution?.total}
+            currentName={pokemon.species?.name ?? pokemon.name}
+            onPress={openPokemon}
+            shiny={shiny}
+          />
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Dimensions</Text>

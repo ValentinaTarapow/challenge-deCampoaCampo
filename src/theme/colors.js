@@ -7,6 +7,7 @@ export const colors = {
   textMuted: '#6B7280',
   primary: '#EF5350',
   border: '#E5E7EB',
+  skeleton: '#D5E0E8',
   pokedex: {
     red: '#DC0A2D',
     redDeep: '#C00828',
