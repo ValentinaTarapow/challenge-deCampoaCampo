@@ -72,7 +72,10 @@ function StatRow({ name, value }) {
 
 function typeName(item) {
   if (typeof item === 'string') return item;
-  return item?.type ?? item?.name ?? null;
+  if (typeof item?.type === 'string') return item.type;
+  if (typeof item?.type?.name === 'string') return item.type.name;
+  if (typeof item?.name === 'string') return item.name;
+  return null;
 }
 
 function TypeGroup({ types }) {
