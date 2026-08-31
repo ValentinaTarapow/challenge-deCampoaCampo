@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { FavoritesProvider, useFavorites } from './FavoritesContext';
 import { getFavorites, saveFavorites } from '../services/storage';
-import { deleteImageFiles } from '../services/imageCache';
+import { cacheImageUrls, deleteImageFiles } from '../services/imageCache';
 
 jest.mock('../services/storage', () => ({
   getFavorites: jest.fn(),
@@ -51,10 +51,21 @@ function wrapper({ children }) {
 }
 
 const pikachu = { id: 25, name: 'pikachu', image: 'https://img/25.png' };
+const snapshot = {
+  id: '25',
+  name: 'pikachu',
+  image: 'https://img/25.png',
+  types: [],
+};
+const cachedImages = {
+  'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png':
+    'file://cache/25.png',
+};
 
 describe('FavoritesContext', () => {
   beforeEach(() => {
     getFavorites.mockResolvedValue([]);
+    cacheImageUrls.mockResolvedValue(cachedImages);
   });
 
   it('hydrates saved favorites on start', async () => {
@@ -83,11 +94,26 @@ describe('FavoritesContext', () => {
     });
 
     expect(result.current.isFavorite(25)).toBe(true);
-    expect(result.current.favorites[0]).toMatchObject({
-      id: '25',
-      name: 'pikachu',
+    expect(saveFavorites).toHaveBeenCalledWith([snapshot]);
+
+    await waitFor(() => {
+      expect(result.current.favorites[0]?.detail?.pokemon?.name).toBe('pikachu');
     });
-    expect(saveFavorites).toHaveBeenCalled();
+
+    expect(saveFavorites).toHaveBeenLastCalledWith([
+      expect.objectContaining({
+        id: '25',
+        name: 'pikachu',
+        types: ['electric'],
+        image: 'file://cache/25.png',
+        images: cachedImages,
+        detail: expect.objectContaining({
+          pokemon: expect.objectContaining({ id: 25, name: 'pikachu' }),
+          matchups: { weaknesses: ['ground'], resistances: [] },
+          generation: 'generation-i',
+        }),
+      }),
+    ]);
 
     await act(async () => {
       result.current.toggleFavorite(pikachu);
@@ -95,6 +121,7 @@ describe('FavoritesContext', () => {
 
     expect(result.current.isFavorite(25)).toBe(false);
     expect(result.current.favorites).toEqual([]);
-    expect(deleteImageFiles).toHaveBeenCalled();
+    expect(saveFavorites).toHaveBeenLastCalledWith([]);
+    expect(deleteImageFiles).toHaveBeenCalledWith(cachedImages);
   });
 });

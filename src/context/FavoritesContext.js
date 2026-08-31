@@ -184,13 +184,17 @@ export function FavoritesProvider({ children }) {
           (item) => String(item.id) === id,
         );
         deleteImageFiles(removed?.images).catch(() => {});
-        setFavorites((prev) =>
-          persist(prev.filter((item) => String(item.id) !== id)),
+        const next = favoritesRef.current.filter(
+          (item) => String(item.id) !== id,
         );
+        persist(next);
+        setFavorites(next);
         return;
       }
 
-      setFavorites((prev) => persist([snapshot, ...prev]));
+      const next = [snapshot, ...favoritesRef.current];
+      persist(next);
+      setFavorites(next);
       ensureFavoriteDetail(pokemon);
     },
     [ensureFavoriteDetail, favoriteIds, persist],

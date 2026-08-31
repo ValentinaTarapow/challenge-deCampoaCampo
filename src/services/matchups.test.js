@@ -17,7 +17,8 @@ describe('computeTypeMatchups', () => {
     ]);
 
     expect(result.weaknesses).toEqual(['ground']);
-    expect(result.resistances).toEqual(['electric', 'steel']);
+    expect(result.resistances).toEqual(['steel']);
+    expect(result.immunities).toEqual(['electric']);
   });
 
   it('combines dual types (fire / flying)', () => {
@@ -34,11 +35,15 @@ describe('computeTypeMatchups', () => {
     ]);
 
     expect(result.weaknesses).toEqual(['electric', 'rock', 'water']);
-    expect(result.resistances).toContain('ground');
-    expect(result.resistances).toContain('grass');
-    expect(result.resistances).toContain('bug');
-    expect(result.weaknesses).not.toContain('ice');
-    expect(result.weaknesses).not.toContain('ground');
+    expect(result.resistances).toEqual([
+      'bug',
+      'fairy',
+      'fighting',
+      'fire',
+      'grass',
+      'steel',
+    ]);
+    expect(result.immunities).toEqual(['ground']);
   });
 
   it('sorts results alphabetically', () => {
@@ -47,5 +52,14 @@ describe('computeTypeMatchups', () => {
     ]);
     expect(result.weaknesses).toEqual(['electric', 'water']);
     expect(result.resistances).toEqual(['fire', 'steel']);
+    expect(result.immunities).toEqual([]);
+  });
+
+  it('sorts immunities separately from resistances (ghost)', () => {
+    const result = computeTypeMatchups([
+      payload({ half: ['poison', 'bug'], none: ['fighting', 'normal'] }),
+    ]);
+    expect(result.resistances).toEqual(['bug', 'poison']);
+    expect(result.immunities).toEqual(['fighting', 'normal']);
   });
 });

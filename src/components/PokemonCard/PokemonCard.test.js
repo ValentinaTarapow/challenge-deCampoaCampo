@@ -6,6 +6,9 @@ const pokemon = {
   name: 'bulbasaur',
   image: 'https://img/1.png',
   types: ['grass', 'poison'],
+  height: 7,
+  weight: 69,
+  stats: [{ stat: { name: 'hp' }, base_stat: 45 }],
 };
 
 describe('PokemonCard', () => {
@@ -27,11 +30,13 @@ describe('PokemonCard', () => {
     expect(screen.getByText('poison')).toBeOnTheScreen();
   });
 
-  it('calls onPress when the card is tapped', () => {
+  it('calls onPress when the frame is tapped', () => {
     const onPress = jest.fn();
     render(
-      <PokemonCard pokemon={pokemon} onPress={onPress}>
-        <PokemonCard.Name />
+      <PokemonCard pokemon={pokemon}>
+        <PokemonCard.Frame onPress={onPress}>
+          <PokemonCard.Name />
+        </PokemonCard.Frame>
       </PokemonCard>,
     );
 
@@ -47,7 +52,9 @@ describe('PokemonCard', () => {
         isFavorite
         onToggleFavorite={onToggleFavorite}
       >
-        <PokemonCard.Name />
+        <PokemonCard.Frame>
+          <PokemonCard.Name />
+        </PokemonCard.Frame>
       </PokemonCard>,
     );
 
@@ -59,5 +66,66 @@ describe('PokemonCard', () => {
     expect(() => render(<PokemonCard.Name />)).toThrow(
       'PokemonCard.Name must be rendered inside <PokemonCard>.',
     );
+  });
+
+  it('composes detail sections from context', () => {
+    render(
+      <PokemonCard pokemon={pokemon}>
+        <PokemonCard.Identity />
+        <PokemonCard.Stats />
+        <PokemonCard.Dimensions />
+      </PokemonCard>,
+    );
+
+    expect(screen.getByText('Stats')).toBeOnTheScreen();
+    expect(screen.getByText('HP')).toBeOnTheScreen();
+    expect(screen.getByText('Dimensions')).toBeOnTheScreen();
+    expect(screen.getByText('~ 0.7 m')).toBeOnTheScreen();
+    expect(screen.getByText('~ 6.9 kg')).toBeOnTheScreen();
+  });
+
+  it('renders immunities apart from resistances', () => {
+    render(
+      <PokemonCard
+        pokemon={pokemon}
+        matchups={{
+          weaknesses: ['electric', 'rock', 'water'],
+          resistances: ['bug', 'fire'],
+          immunities: ['ground'],
+        }}
+      >
+        <PokemonCard.Matchups />
+      </PokemonCard>,
+    );
+
+    expect(screen.getByText('Weak to')).toBeOnTheScreen();
+    expect(screen.getByText('Resistant to')).toBeOnTheScreen();
+    expect(screen.getByText('Immune to')).toBeOnTheScreen();
+    expect(screen.getByText('ground')).toBeOnTheScreen();
+    expect(screen.queryByText('None')).toBeNull();
+  });
+
+  it('hides empty matchup and ability sections', () => {
+    render(
+      <PokemonCard
+        pokemon={pokemon}
+        matchups={{
+          weaknesses: ['electric'],
+          resistances: [],
+          immunities: [],
+        }}
+        abilities={[]}
+      >
+        <PokemonCard.Matchups />
+        <PokemonCard.Abilities />
+      </PokemonCard>,
+    );
+
+    expect(screen.getByText('Weak to')).toBeOnTheScreen();
+    expect(screen.getByText('electric')).toBeOnTheScreen();
+    expect(screen.queryByText('Resistant to')).toBeNull();
+    expect(screen.queryByText('Immune to')).toBeNull();
+    expect(screen.queryByText('Abilities')).toBeNull();
+    expect(screen.queryByText('None')).toBeNull();
   });
 });

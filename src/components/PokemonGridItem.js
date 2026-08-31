@@ -12,16 +12,19 @@ export const PokemonGridItem = memo(function PokemonGridItem({
   return (
     <PokemonCard
       pokemon={item}
-      style={{ width: cardWidth }}
-      onPress={() => onPress(item)}
       isFavorite={isFavorite(item.id)}
       onToggleFavorite={() => toggleFavorite(item)}
     >
-      <PokemonCard.Image size={cardWidth - 24} />
-      <PokemonCard.Content>
-        <PokemonCard.Id />
-        <PokemonCard.Name />
-      </PokemonCard.Content>
+      <PokemonCard.Frame
+        style={{ width: cardWidth }}
+        onPress={() => onPress(item)}
+      >
+        <PokemonCard.Image size={cardWidth - 24} />
+        <PokemonCard.Content>
+          <PokemonCard.Id />
+          <PokemonCard.Name />
+        </PokemonCard.Content>
+      </PokemonCard.Frame>
     </PokemonCard>
   );
 });

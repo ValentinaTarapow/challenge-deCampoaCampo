@@ -53,7 +53,7 @@ describe('pokemonDetail', () => {
   it('builds a persistable detail bundle', () => {
     const detail = buildDetail({
       pokemon: pikachu,
-      matchups: { weaknesses: ['ground'], resistances: ['steel'] },
+      matchups: { weaknesses: ['ground'], resistances: ['steel'], immunities: [] },
       generation: 'generation-i',
       varieties: [],
       evolution: { stages: [], linear: true, total: 0 },

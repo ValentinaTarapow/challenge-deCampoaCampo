@@ -21,14 +21,17 @@ export function computeTypeMatchups(typePayloads) {
 
   const weaknesses = [];
   const resistances = [];
+  const immunities = [];
 
   Object.entries(multipliers).forEach(([type, multiplier]) => {
     if (multiplier > 1) weaknesses.push(type);
-    if (multiplier < 1) resistances.push(type);
+    else if (multiplier === 0) immunities.push(type);
+    else if (multiplier < 1) resistances.push(type);
   });
 
   weaknesses.sort();
   resistances.sort();
+  immunities.sort();
 
-  return { weaknesses, resistances };
+  return { weaknesses, resistances, immunities };
 }
