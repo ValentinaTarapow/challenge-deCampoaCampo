@@ -13,10 +13,6 @@ export default function RemoteImage({ source, size = 72, style }) {
   const ready = loadedUri === source;
   const failed = failedUri === source;
   const imageSource = useMemo(() => ({ uri: source }), [source]);
-  const wrapStyle = useMemo(
-    () => [{ width: size, height: size }, styles.wrap, style],
-    [size, style],
-  );
 
   const onLoad = useCallback(() => {
     loadedUris.add(source);
@@ -29,7 +25,7 @@ export default function RemoteImage({ source, size = 72, style }) {
   }, [source]);
 
   return (
-    <View style={wrapStyle}>
+    <View style={[{ width: size, height: size }, styles.wrap, style]}>
       <Image
         source={imageSource}
         style={[styles.image, ready ? styles.visible : styles.hidden]}

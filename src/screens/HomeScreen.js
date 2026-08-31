@@ -247,7 +247,6 @@ export default function HomeScreen({ navigation }) {
         onEndReachedThreshold={0.4}
         initialNumToRender={12}
         maxToRenderPerBatch={9}
-        windowSize={10}
         removeClippedSubviews
         ListEmptyComponent={ListEmpty}
         ListFooterComponent={
