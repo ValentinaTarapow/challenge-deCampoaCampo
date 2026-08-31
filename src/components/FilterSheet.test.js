@@ -62,6 +62,8 @@ describe('FilterSheet', () => {
     expect(screen.getByText('Region')).toBeOnTheScreen();
     expect(screen.getByText('Type')).toBeOnTheScreen();
     expect(screen.getByText('Kanto (Gen I)')).toBeOnTheScreen();
+    expect(screen.getByText('Galar (Gen VIII)')).toBeOnTheScreen();
+    expect(screen.getByText('Hisui (Gen VIII)')).toBeOnTheScreen();
     expect(screen.getByText('Paldea (Gen IX)')).toBeOnTheScreen();
     expect(screen.getByText('fire')).toBeOnTheScreen();
     expect(screen.getByText('fairy')).toBeOnTheScreen();

@@ -175,6 +175,48 @@ describe('getPokemonExtras', () => {
     getEvolutionChainByUrl.mockResolvedValue(chainPayload);
   });
 
+  it('returns matchups, generation, abilities and evolutions together', async () => {
+    const extras = await getPokemonExtras(pikachu);
+
+    expect(extras.matchups.weaknesses).toContain('ground');
+    expect(extras.generation).toBe('generation-i');
+    expect(extras.abilities[0]).toMatchObject({
+      id: 'static',
+      name: 'Static',
+    });
+    expect(extras.evolution.total).toBe(2);
+    expect(extras.error).toBeNull();
+  });
+
+  it('labels a Hisui form from the Pokémon name, not the species generation', async () => {
+    getPokemonSpecies.mockResolvedValue({
+      ...speciesPayload,
+      name: 'growlithe',
+      generation: { name: 'generation-i' },
+    });
+
+    const extras = await getPokemonExtras({
+      ...pikachu,
+      name: 'growlithe-hisui',
+      species: { name: 'growlithe' },
+    });
+
+    expect(extras.generation).toBe('hisui');
+  });
+
+  it('keeps matchups when species fails', async () => {
+    getPokemonSpecies.mockRejectedValue(new Error('species down'));
+
+    const extras = await getPokemonExtras(pikachu);
+
+    expect(extras.matchups.weaknesses).toContain('ground');
+    expect(extras.abilities[0].id).toBe('static');
+    expect(extras.generation).toBeNull();
+    expect(extras.varieties).toBeNull();
+    expect(extras.evolution).toBeNull();
+    expect(extras.error).toEqual(expect.any(Error));
+  });
+
   it('keeps matchups when the evolution chain fails', async () => {
     getEvolutionChainByUrl.mockRejectedValue(new Error('chain down'));
 

@@ -21,7 +21,7 @@ src/
   context/       # FavoritesProvider
   services/      # Axios, PokeAPI, storage, cache de imágenes
   theme/         # colores + contraste de tipos
-  utils/         # search
+  utils/         # search (nombre/#id + filtro de catálogo)
 ```
 
 ## Navegación
@@ -37,16 +37,16 @@ El detalle **no** tapa la tab bar: podés saltar a Favorites sin volver a la lis
 ## Funciones
 
 - **Lista** — grilla de 3, infinite scroll (`limit`/`offset`), pull to refresh.
-- **Search** — filtro en tiempo real por nombre o `#id` sobre un catálogo de nombres. Mega, gmax y caps no aparecen; las formas regionales sí, con el filtro de región.
-- **Filter** — sheet por región, generación y tipo (se pueden combinar). Chips activos para sacar uno o limpiar todo.
-- **Detalle** — types, stats, matchups, evoluciones, forms, abilities, shiny, generación.
+- **Search** — filtro en tiempo real por nombre o `#id` sobre un catálogo de nombres. Mientras carga el catálogo hay skeleton (no una grilla vacía). Mega, gmax y caps no aparecen; las formas regionales sí, con el filtro de región.
+- **Filter** — sheet por región, generación y tipo (se pueden combinar). Chips activos para sacar uno o limpiar todo. El dex lista **especies**; el catálogo las expande a la forma regional (`growlithe-hisui`). Hisui y Galar son chips distintos (ambos Gen VIII).
+- **Detalle** — types, stats, matchups, evoluciones, forms, abilities, shiny, generación. Los extras se piden en paralelo: si falla evo o una ability, matchups se quedan.
 - **Shiny** — en el detalle, el botón de estrella cambia el artwork (también en evoluciones y forms).
 - **Evoluciones** — cadena completa. Línea simple en fila; ramificadas (Eevee, Wurmple) apiladas. Tap abre esa ficha.
 - **Matchups** — tres secciones: Weak to (`> 1`), Resistant to (`< 1` y `> 0`), Immune to (`×0`). Vacío oculta la sección (Pikachu no muestra Immune). Dual-type: Fire/Flying vs Ground es immune, no resist.
 - **Stats** — las 6 base stats en fila (nombre · valor · 15 dots). Fill = `base_stat / 255`. Color por calidad ([WikiDex](https://www.wikidex.net/wiki/Mewtwo#Caracter%C3%ADsticas_de_combate)): rojo `< 30`, naranja `< 60`, amarillo `< 90`, lima `< 120`, verde `< 150`, teal `150+`.
 - **Abilities** — flavor text en inglés. Hidden abilities no se muestran. Si no hay visibles, no se renderiza la sección.
 - **Favoritos** — corazón en card y en el header del detalle. Tab Favorites con badge.
-- **Offline** — favoritos (ficha + sprites en disco) y última lista de Home sin red.
+- **Offline** — favoritos (ficha + sprites en disco) y última lista de Home sin red. El banner “Saved favorite · available offline” sale **solo** si falló la red, no si el favorito se abrió con conexión. Al arrancar, si un favorito quedó sin extras, se rehidrata.
 - **Chrome** — status bar rojo, sombra bajo el header/buscador y arriba de la tab bar.
 
 ## Compound Pattern
@@ -116,7 +116,7 @@ npm run android
 npm test
 ```
 
-Jest + `jest-expo` cubren búsqueda, persistencia, errores, filtros, matchups, detalle (helpers), favoritos, estados de UI y el Compound Pattern de `PokemonCard`.
+Jest + `jest-expo`, **78 tests**: búsqueda (nombre/`#id`, ocultar mega/gmax/caps), regiones/Hisui, persistencia, errores, filtros, matchups, extras parciales, favoritos (rehydrate), banner offline, estados de UI y el Compound Pattern de `PokemonCard`.
 
 ## Repo
 

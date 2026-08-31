@@ -156,4 +156,22 @@ describe('PokemonCard', () => {
     expect(screen.getByText('Overgrow')).toBeOnTheScreen();
     expect(screen.getByText('Could not load extra details.')).toBeOnTheScreen();
   });
+
+  it('shows the offline banner only when the ficha came from cache', () => {
+    const { rerender } = render(
+      <PokemonCard pokemon={pokemon}>
+        <PokemonCard.OfflineBanner />
+      </PokemonCard>,
+    );
+
+    expect(screen.queryByText('Saved favorite · available offline')).toBeNull();
+
+    rerender(
+      <PokemonCard pokemon={pokemon} fromCache>
+        <PokemonCard.OfflineBanner />
+      </PokemonCard>,
+    );
+
+    expect(screen.getByText('Saved favorite · available offline')).toBeOnTheScreen();
+  });
 });

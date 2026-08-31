@@ -12,6 +12,7 @@ import {
   parseVarieties,
   pokemonNamesForRegions,
   isDefaultPokemon,
+  regionIdFromPokemonName,
   resolvePokemonGeneration,
 } from './pokemon';
 
@@ -67,6 +68,31 @@ describe('pokemon helpers', () => {
         {
           generation: { name: 'generation-viii' },
           pokedex_numbers: [{ pokedex: { name: 'galar' } }],
+        },
+      ),
+    ).toBe('generation-viii');
+  });
+
+  it('reads the region from a form name and ignores caps', () => {
+    expect(regionIdFromPokemonName('growlithe-hisui')).toBe('hisui');
+    expect(regionIdFromPokemonName('raichu-alola')).toBe('alola');
+    expect(regionIdFromPokemonName('mr-mime-galar')).toBe('galar');
+    expect(regionIdFromPokemonName('tauros-paldea-combat-breed')).toBe('paldea');
+    expect(regionIdFromPokemonName('pikachu-alola-cap')).toBeNull();
+    expect(regionIdFromPokemonName('charizard-mega-x')).toBeNull();
+    expect(regionIdFromPokemonName('growlithe')).toBeNull();
+  });
+
+  it('does not treat a Galar species as Hisui just because it also appears in the Hisui dex', () => {
+    expect(
+      resolvePokemonGeneration(
+        { name: 'eevee' },
+        {
+          generation: { name: 'generation-viii' },
+          pokedex_numbers: [
+            { pokedex: { name: 'galar' } },
+            { pokedex: { name: 'hisui' } },
+          ],
         },
       ),
     ).toBe('generation-viii');
@@ -132,6 +158,9 @@ describe('pokemon helpers', () => {
     expect(
       [...expandRegionPokemonNames(['pikachu'], 'alola', catalog)],
     ).toEqual(['pikachu']);
+    expect(
+      [...expandRegionPokemonNames(['charizard'], 'alola', ['charizard', 'charizard-mega-x'])],
+    ).toEqual(['charizard']);
   });
 
   it('unions expanded names when several regions are selected', () => {

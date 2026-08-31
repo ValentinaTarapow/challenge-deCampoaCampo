@@ -44,7 +44,7 @@ import {
   normalizeFilters,
 } from '../components/FilterSheet';
 import { describeError } from '../services/errors';
-import { matchesSearch } from '../utils/search';
+import { filterPokemonCatalog } from '../utils/search';
 import { colors } from '../theme/colors';
 
 const PAGE_SIZE = 24;
@@ -370,12 +370,10 @@ export default function HomeScreen({ navigation }) {
     const regionNames = activeSets?.regions
       ? pokemonNamesForRegions(activeSets.regions, catalogNames)
       : null;
-    return catalog.filter((item) => {
-      if (activeSets?.type && !activeSets.type.has(item.name)) return false;
-      if (regionNames && !regionNames.has(item.name)) return false;
-      if (!isDefaultPokemon(item) && !regionNames?.has(item.name)) return false;
-      if (term && !matchesSearch(item, term)) return false;
-      return true;
+    return filterPokemonCatalog(catalog, {
+      term,
+      typeNames: activeSets?.type,
+      regionNames,
     });
   }, [pokemon, catalog, catalogNames, query, hasFilters, activeSets]);
 
