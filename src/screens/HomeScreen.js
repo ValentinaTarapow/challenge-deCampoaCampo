@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -39,6 +40,17 @@ const LIST_PADDING = 16;
 const GRID_GAP = 10;
 
 const keyExtractor = (item) => String(item.id);
+
+function Screen({ children }) {
+  return (
+    <View style={styles.topSafe}>
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.screen}>{children}</View>
+      </SafeAreaView>
+      <SafeAreaView style={styles.bottomSafe} edges={['bottom']} />
+    </View>
+  );
+}
 
 function ListEmpty({ searching, filtering }) {
   const message =
@@ -332,18 +344,30 @@ export default function HomeScreen({ navigation }) {
   );
 
   if (loading) {
-    return <LoadingState message="Loading Pokémon..." />;
+    return (
+      <Screen>
+        <LoadingState message="Loading Pokémon..." />
+      </Screen>
+    );
   }
 
   if (error && pokemon.length === 0) {
-    return <ErrorState message={error} onRetry={loadInitial} />;
+    return (
+      <Screen>
+        <ErrorState message={error} onRetry={loadInitial} />
+      </Screen>
+    );
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <Screen>
       <View style={styles.header}>
-        <Text style={styles.title}>Pokédex</Text>
-        <Text style={styles.subtitle}>Explore the PokeAPI</Text>
+        <Image
+          source={require('../../assets/pokedex-logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+          accessibilityLabel="PokéDex logo"
+        />
         <View style={styles.searchRow}>
           <View style={styles.searchWrap}>
             <TextInput
@@ -471,31 +495,38 @@ export default function HomeScreen({ navigation }) {
           )
         }
       />
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  topSafe: {
+    flex: 1,
+    backgroundColor: colors.primary,
+  },
   safe: {
+    flex: 1,
+  },
+  screen: {
     flex: 1,
     backgroundColor: colors.background,
   },
+  bottomSafe: {
+    backgroundColor: colors.safeBottom,
+  },
   header: {
     paddingHorizontal: LIST_PADDING,
+    paddingTop: 20,
     paddingBottom: 12,
-    gap: 4,
+    alignItems: 'center',
+    gap: 8,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: colors.text,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.textMuted,
-    marginBottom: 8,
+  logo: {
+    width: 180,
+    height: 65,
   },
   searchRow: {
+    alignSelf: 'stretch',
     flexDirection: 'row',
     alignItems: 'stretch',
     gap: 8,

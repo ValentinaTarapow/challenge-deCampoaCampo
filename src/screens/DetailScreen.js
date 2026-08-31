@@ -26,6 +26,7 @@ import { RemoteImage } from '../components/PokemonCard';
 import { TypeBadge } from '../components/TypeBadge';
 import { GenerationBadge } from '../components/GenerationBadge';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 
 const STAT_MAX = 255;
@@ -470,11 +471,21 @@ export default function DetailScreen({ route, navigation }) {
   );
 
   if (loading) {
-    return <LoadingState message="Loading details..." />;
+    return (
+      <View style={styles.container}>
+        <LoadingState message="Loading details..." />
+        <SafeAreaView edges={['bottom']} style={styles.bottomSafe} />
+      </View>
+    );
   }
 
   if (error || !pokemon) {
-    return <ErrorState message={error || 'Not found'} onRetry={load} />;
+    return (
+      <View style={styles.container}>
+        <ErrorState message={error || 'Not found'} onRetry={load} />
+        <SafeAreaView edges={['bottom']} style={styles.bottomSafe} />
+      </View>
+    );
   }
 
   const types = pokemon.types.map((entry) => entry.type.name);
@@ -633,6 +644,7 @@ export default function DetailScreen({ route, navigation }) {
         }}
         shiny={shiny}
       />
+      <SafeAreaView edges={['bottom']} style={styles.bottomSafe} />
     </View>
   );
 }
@@ -641,6 +653,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  bottomSafe: {
+    backgroundColor: colors.safeBottom,
   },
   scroll: {
     flex: 1,

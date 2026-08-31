@@ -1,6 +1,7 @@
 export const colors = {
   background: '#F4F6F8',
   surface: '#FFFFFF',
+  safeBottom: '#FFFFFF',
   text: '#1A1A1A',
   textMuted: '#6B7280',
   primary: '#EF5350',
