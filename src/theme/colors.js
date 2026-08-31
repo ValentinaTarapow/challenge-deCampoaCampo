@@ -5,6 +5,16 @@ export const colors = {
   textMuted: '#6B7280',
   primary: '#EF5350',
   border: '#E5E7EB',
+  pokedex: {
+    red: '#DC0A2D',
+    redDeep: '#C00828',
+    redShadow: '#8B061C',
+    lens: '#3BAAF5',
+    lensDeep: '#1A7ED1',
+    silver: '#F3F6F8',
+    chrome: '#C5CDD3',
+    yellow: '#F7D02C',
+  },
   types: {
     normal: '#A8A878',
     fire: '#F08030',
