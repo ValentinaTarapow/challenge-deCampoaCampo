@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, ScrollView, StyleSheet, View } from 'react-native';
 import { colors } from '../theme/colors';
 
 export function Skeleton({ width, height, radius = 8, style }) {
@@ -81,7 +81,7 @@ export function PokemonGridSkeleton({ count = 12, gap = 10, columns = 3 }) {
 }
 
 export function TypeChipSkeleton() {
-  return <Skeleton width={72} height={28} radius={999} />;
+  return <Skeleton width={58} height={24} radius={999} />;
 }
 
 export function AbilityBlockSkeleton() {
@@ -106,7 +106,11 @@ export function EvolutionRowSkeleton() {
 
 export function DetailScreenSkeleton() {
   return (
-    <View style={styles.detail} accessibilityLabel="Loading details">
+    <ScrollView
+      style={styles.detailScroll}
+      contentContainerStyle={styles.detail}
+      accessibilityLabel="Loading details"
+    >
       <View style={styles.hero}>
         <Skeleton width={168} height={168} radius={12} />
         <Skeleton width={180} height={22} radius={8} />
@@ -122,7 +126,7 @@ export function DetailScreenSkeleton() {
           <Skeleton width="76%" height={12} radius={4} />
         </View>
       ))}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -168,9 +172,13 @@ const styles = StyleSheet.create({
   },
   evoRow: {
     flexDirection: 'row',
+    flexWrap: 'nowrap',
     justifyContent: 'center',
     gap: 10,
     paddingVertical: 4,
+  },
+  detailScroll: {
+    flex: 1,
   },
   detail: {
     padding: 16,

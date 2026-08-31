@@ -521,9 +521,13 @@ export default function HomeScreen({ navigation }) {
           />
 
           {showGridSkeleton ? (
-            <View style={styles.listPane}>
+            <ScrollView
+              style={styles.list}
+              contentContainerStyle={styles.listContent}
+              keyboardShouldPersistTaps="handled"
+            >
               <PokemonGridSkeleton />
-            </View>
+            </ScrollView>
           ) : listError ? (
             <ErrorState
               kind={listError.kind}
@@ -716,11 +720,6 @@ const styles = StyleSheet.create({
   },
   list: {
     flex: 1,
-  },
-  listPane: {
-    flex: 1,
-    paddingHorizontal: LIST_PADDING,
-    paddingTop: 16,
   },
   listContent: {
     paddingHorizontal: LIST_PADDING,

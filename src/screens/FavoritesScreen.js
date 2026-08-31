@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import {
   FlatList,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -44,8 +45,6 @@ export default function FavoritesScreen({ navigation }) {
     [cardWidth, onPressPokemon],
   );
 
-  const listData = ready ? favorites : [];
-
   return (
     <Screen>
       <View style={styles.header}>
@@ -59,29 +58,33 @@ export default function FavoritesScreen({ navigation }) {
         </Text>
         <HeaderDropShadow edge="bottom" />
       </View>
-      <FlatList
-        data={listData}
-        numColumns={NUM_COLUMNS}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        style={styles.list}
-        contentContainerStyle={[
-          styles.listContent,
-          listData.length === 0 && styles.listContentEmpty,
-        ]}
-        columnWrapperStyle={listData.length ? styles.row : undefined}
-        ListEmptyComponent={
-          ready ? (
-            <EmptyState
-              icon="heart-outline"
-              title="No favorites yet"
-              message="Tap the heart on a Pokémon to save it here. Favorites stay available offline."
-            />
-          ) : (
-            <PokemonGridSkeleton />
-          )
-        }
-      />
+      {!ready ? (
+        <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+          <PokemonGridSkeleton />
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={favorites}
+          numColumns={NUM_COLUMNS}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          style={styles.list}
+          contentContainerStyle={[
+            styles.listContent,
+            favorites.length === 0 && styles.listContentEmpty,
+          ]}
+          columnWrapperStyle={favorites.length ? styles.row : undefined}
+          ListEmptyComponent={
+            <View style={[styles.emptyWrap, { width: width - LIST_PADDING * 2 }]}>
+              <EmptyState
+                icon="heart-outline"
+                title="No favorites yet"
+                message="Tap the heart on a Pokémon to save it here. Favorites stay available offline."
+              />
+            </View>
+          }
+        />
+      )}
     </Screen>
   );
 }
@@ -115,6 +118,10 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   listContentEmpty: {
+    justifyContent: 'center',
+  },
+  emptyWrap: {
+    flexGrow: 1,
     justifyContent: 'center',
   },
   row: {
