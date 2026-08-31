@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { colors } from '../../theme/colors';
 import RemoteImage from './RemoteImage';
+import { TypeBadge } from '../TypeBadge';
 
 const PokemonCardContext = createContext(null);
 
@@ -62,15 +63,7 @@ function Types({ style }) {
   return (
     <View style={[styles.typesRow, style]}>
       {pokemon.types.map((type) => (
-        <View
-          key={type}
-          style={[
-            styles.typeBadge,
-            { backgroundColor: colors.types[type] || colors.textMuted },
-          ]}
-        >
-          <Text style={styles.typeText}>{type}</Text>
-        </View>
+        <TypeBadge key={type} type={type} />
       ))}
     </View>
   );
@@ -123,17 +116,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     marginTop: 4,
-  },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-  },
-  typeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'capitalize',
   },
 });
 
