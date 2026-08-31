@@ -135,11 +135,16 @@ export default function DetailScreen({ route, navigation }) {
         setExtrasError(null);
         const extras = await getPokemonExtras(pokemon);
         if (cancelled) return;
-        setMatchups(extras.matchups);
-        setGeneration(extras.generation);
-        setVarieties(extras.varieties);
-        setAbilities(extras.abilities);
-        setEvolution(extras.evolution);
+        if (extras.matchups != null) setMatchups(extras.matchups);
+        if (extras.varieties != null) {
+          setGeneration(extras.generation);
+          setVarieties(extras.varieties);
+        }
+        if (extras.abilities != null) setAbilities(extras.abilities);
+        if (extras.evolution != null) setEvolution(extras.evolution);
+        setExtrasError(
+          extras.error ? describeError(extras.error, 'extras') : null,
+        );
       } catch (err) {
         if (!cancelled) {
           setExtrasError(describeError(err, 'extras'));
@@ -182,8 +187,7 @@ export default function DetailScreen({ route, navigation }) {
   );
 
   const retryExtras = () => setExtrasRetry((n) => n + 1);
-  const extrasFailed =
-    Boolean(extrasError) && !matchups && abilities == null && evolution == null;
+  const extrasFailed = Boolean(extrasError);
 
   if (loading) {
     return (

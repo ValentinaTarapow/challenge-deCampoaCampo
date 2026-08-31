@@ -452,8 +452,8 @@ export function ExtrasError() {
 }
 
 export function Matchups() {
-  const { extrasFailed } = usePokemonCard('PokemonCard.Matchups');
-  if (extrasFailed) return <ExtrasError />;
+  const { extrasFailed, matchups } = usePokemonCard('PokemonCard.Matchups');
+  if (extrasFailed && !matchups) return <ExtrasError />;
   return (
     <>
       <Weaknesses />
@@ -483,8 +483,13 @@ export function Stats() {
 }
 
 export function Abilities() {
-  const { extrasFailed, abilities } = usePokemonCard('PokemonCard.Abilities');
-  if (extrasFailed) return null;
+  const { extrasFailed, abilities, matchups, evolution } = usePokemonCard(
+    'PokemonCard.Abilities',
+  );
+  const extrasAllFailed =
+    extrasFailed && !matchups && abilities == null && !evolution;
+  if (extrasAllFailed) return null;
+  if (extrasFailed && abilities == null) return <ExtrasError />;
   if (abilities != null && !abilities.length) return null;
 
   return (
@@ -505,9 +510,12 @@ export function Abilities() {
 }
 
 export function Evolutions() {
-  const { pokemon, evolution, extrasFailed, onOpenPokemon, shiny } =
+  const { pokemon, evolution, extrasFailed, matchups, abilities, onOpenPokemon, shiny } =
     usePokemonCard('PokemonCard.Evolutions');
-  if (extrasFailed) return null;
+  const extrasAllFailed =
+    extrasFailed && !matchups && abilities == null && !evolution;
+  if (extrasAllFailed) return null;
+  if (extrasFailed && !evolution) return <ExtrasError />;
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Evolutions</Text>

@@ -91,6 +91,14 @@ export function buildDetail({
   };
 }
 
+async function settle(promise) {
+  try {
+    return { ok: true, value: await promise };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
 export async function getPokemonExtras(pokemon) {
   const visibleAbilities = (pokemon.abilities ?? []).filter(
     (entry) => !entry.is_hidden,
@@ -99,28 +107,61 @@ export async function getPokemonExtras(pokemon) {
     .map((entry) => (typeof entry === 'string' ? entry : entry?.type?.name))
     .filter(Boolean);
 
-  const [typePayloads, species, abilityPayloads] = await Promise.all([
-    Promise.all(typeNames.map(getType)),
-    getPokemonSpecies(pokemon.species?.name ?? pokemon.id),
+  const [typesResult, speciesResult, abilityResults] = await Promise.all([
+    settle(Promise.all(typeNames.map(getType))),
+    settle(getPokemonSpecies(pokemon.species?.name ?? pokemon.id)),
     Promise.all(
-      visibleAbilities.map((entry) => getAbility(entry.ability.name)),
+      visibleAbilities.map(async (entry) => ({
+        entry,
+        ...(await settle(getAbility(entry.ability.name))),
+      })),
     ),
   ]);
 
   const extras = {
-    matchups: computeTypeMatchups(typePayloads),
-    generation: resolvePokemonGeneration(pokemon, species),
-    varieties: parseVarieties(species),
-    abilities: abilityPayloads.map((payload, index) => ({
-      id: visibleAbilities[index].ability.name,
-      ...parseAbilityInfo(payload),
-    })),
-    evolution: { stages: [], linear: true, total: 0 },
+    matchups: typesResult.ok ? computeTypeMatchups(typesResult.value) : null,
+    generation: null,
+    varieties: null,
+    abilities: null,
+    evolution: null,
+    error: typesResult.ok ? null : typesResult.error,
   };
 
+  if (!visibleAbilities.length) {
+    extras.abilities = [];
+  } else {
+    extras.abilities = abilityResults
+      .filter((result) => result.ok)
+      .map((result) => ({
+        id: result.entry.ability.name,
+        ...parseAbilityInfo(result.value),
+      }));
+    if (!extras.abilities.length) {
+      extras.abilities = null;
+      extras.error = extras.error ?? abilityResults.find((result) => !result.ok)?.error;
+    }
+  }
+
+  if (!speciesResult.ok) {
+    extras.error = extras.error ?? speciesResult.error;
+    return extras;
+  }
+
+  const species = speciesResult.value;
+  extras.generation = resolvePokemonGeneration(pokemon, species);
+  extras.varieties = parseVarieties(species);
+  extras.evolution = { stages: [], linear: true, total: 0 };
+
   if (species.evolution_chain?.url) {
-    const chain = await getEvolutionChainByUrl(species.evolution_chain.url);
-    extras.evolution = parseEvolutionStages(chain.chain);
+    const chainResult = await settle(
+      getEvolutionChainByUrl(species.evolution_chain.url),
+    );
+    if (chainResult.ok) {
+      extras.evolution = parseEvolutionStages(chainResult.value.chain);
+    } else {
+      extras.evolution = null;
+      extras.error = extras.error ?? chainResult.error;
+    }
   }
 
   return extras;

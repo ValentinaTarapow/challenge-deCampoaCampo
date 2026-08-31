@@ -128,4 +128,32 @@ describe('PokemonCard', () => {
     expect(screen.queryByText('Abilities')).toBeNull();
     expect(screen.queryByText('None')).toBeNull();
   });
+
+  it('keeps matchups visible when extras fail later', () => {
+    render(
+      <PokemonCard
+        pokemon={pokemon}
+        extrasFailed
+        extrasError={{
+          kind: 'unknown',
+          title: 'Something went wrong',
+          message: 'Could not load extra details.',
+        }}
+        matchups={{
+          weaknesses: ['fire'],
+          resistances: [],
+          immunities: [],
+        }}
+        abilities={[{ id: 'overgrow', name: 'Overgrow', description: 'Boosts Grass.' }]}
+      >
+        <PokemonCard.Matchups />
+        <PokemonCard.Abilities />
+        <PokemonCard.Evolutions />
+      </PokemonCard>,
+    );
+
+    expect(screen.getByText('Weak to')).toBeOnTheScreen();
+    expect(screen.getByText('Overgrow')).toBeOnTheScreen();
+    expect(screen.getByText('Could not load extra details.')).toBeOnTheScreen();
+  });
 });
