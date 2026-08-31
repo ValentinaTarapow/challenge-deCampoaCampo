@@ -9,7 +9,10 @@ export function GenerationBadge({ generation }) {
 
   return (
     <View style={[styles.badge, { backgroundColor }]}>
-      <Text style={[styles.text, { color: onColor(backgroundColor) }]}>
+      <Text
+        style={[styles.text, { color: onColor(backgroundColor) }]}
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </View>
@@ -25,6 +28,6 @@ const styles = StyleSheet.create({
   text: {
     fontWeight: '800',
     fontSize: 11,
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
 });

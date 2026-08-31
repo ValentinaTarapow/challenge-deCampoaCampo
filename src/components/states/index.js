@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../theme/colors';
 
-export function LoadingState({ message = 'Cargando...' }) {
+export function LoadingState({ message = 'Loading...' }) {
   return (
     <View style={styles.center}>
       <ActivityIndicator size="large" color={colors.primary} />
@@ -10,13 +10,13 @@ export function LoadingState({ message = 'Cargando...' }) {
   );
 }
 
-export function ErrorState({ message = 'Algo salió mal', onRetry }) {
+export function ErrorState({ message = 'Something went wrong', onRetry }) {
   return (
     <View style={styles.center}>
       <Text style={styles.text}>{message}</Text>
       {onRetry ? (
         <Pressable onPress={onRetry} style={styles.retry}>
-          <Text style={styles.retryText}>Reintentar</Text>
+          <Text style={styles.retryText}>Retry</Text>
         </Pressable>
       ) : null}
     </View>

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,19 +9,23 @@ import {
   View,
 } from 'react-native';
 import {
+  getAbility,
   getEvolutionChainByUrl,
   getPokemonByNameOrId,
   getPokemonImageUrl,
   getPokemonSpecies,
   getPokemonSpriteUrl,
   getType,
+  parseAbilityInfo,
   parseEvolutionStages,
+  parseVarieties,
 } from '../services/pokemon';
 import { computeTypeMatchups } from '../services/matchups';
 import { LoadingState, ErrorState } from '../components/states';
 import { RemoteImage } from '../components/PokemonCard';
 import { TypeBadge } from '../components/TypeBadge';
 import { GenerationBadge } from '../components/GenerationBadge';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 
 const STAT_MAX = 255;
@@ -70,16 +75,72 @@ function StatRow({ name, value }) {
   );
 }
 
+function typeName(item) {
+  if (typeof item === 'string') return item;
+  return item?.type ?? item?.name ?? null;
+}
+
 function TypeGroup({ types }) {
-  if (!types?.length) {
-    return <Text style={styles.meta}>Ninguno</Text>;
+  const names = (types ?? []).map(typeName).filter(Boolean);
+
+  if (!names.length) {
+    return <Text style={styles.meta}>None</Text>;
   }
 
   return (
     <View style={styles.wrapRow}>
-      {types.map((type) => (
-        <TypeBadge key={type} type={type} />
+      {names.map((name) => (
+        <View key={name} style={styles.wrapItem}>
+          <TypeBadge type={name} />
+        </View>
       ))}
+    </View>
+  );
+}
+
+function IconTip({
+  open,
+  tip,
+  onPress,
+  label,
+  children,
+  placement = 'above',
+  compact = false,
+}) {
+  const below = placement === 'below';
+
+  return (
+    <View style={[styles.helpWrap, compact && styles.helpWrapCompact]}>
+      {open ? (
+        <View
+          style={[
+            styles.tooltipSlot,
+            below ? styles.tooltipSlotBelow : styles.tooltipSlotAbove,
+          ]}
+          pointerEvents="none"
+        >
+          <View style={styles.tooltipBubble}>
+            <Text style={styles.tooltipText}>{tip}</Text>
+            <View
+              style={[
+                styles.tooltipArrow,
+                below ? styles.tooltipArrowUp : styles.tooltipArrowDown,
+              ]}
+            />
+          </View>
+        </View>
+      ) : null}
+      <Pressable onPress={onPress} hitSlop={8} accessibilityLabel={label}>
+        <View
+          style={[
+            styles.helpBtn,
+            compact && styles.helpBtnCompact,
+            open && styles.helpBtnOpen,
+          ]}
+        >
+          {children}
+        </View>
+      </Pressable>
     </View>
   );
 }
@@ -89,25 +150,17 @@ function MatchupSection({ title, tip, types, loaded, tipOpen, onToggleTip }) {
     <View style={[styles.section, tipOpen && styles.sectionRaised]}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{title}</Text>
-        <View style={styles.helpWrap}>
-          {tipOpen ? (
-            <View style={styles.tooltip} pointerEvents="none">
-              <Text style={styles.tooltipText}>{tip}</Text>
-              <View style={styles.tooltipArrow} />
-            </View>
-          ) : null}
-          <Pressable
-            onPress={onToggleTip}
-            hitSlop={8}
-            accessibilityLabel={`Qué significa ${title}`}
-          >
-            <View style={[styles.helpBtn, tipOpen && styles.helpBtnOpen]}>
-              <Text style={[styles.helpBtnText, tipOpen && styles.helpBtnTextOpen]}>
-                ?
-              </Text>
-            </View>
-          </Pressable>
-        </View>
+        <IconTip
+          open={tipOpen}
+          tip={tip}
+          onPress={onToggleTip}
+          label={`What ${title} means`}
+          compact
+        >
+          <Text style={[styles.helpBtnText, tipOpen && styles.helpBtnTextOpen]}>
+            ?
+          </Text>
+        </IconTip>
       </View>
       {loaded ? (
         <TypeGroup types={types} />
@@ -126,6 +179,16 @@ function EvolutionNode({ pokemon, currentName, onPress }) {
       <Text style={styles.evoName} numberOfLines={1}>
         {pokemon.name}
       </Text>
+      {pokemon.gender ? (
+        <Text
+          style={[
+            styles.evoGender,
+            pokemon.gender === 'female' ? styles.evoGenderFemale : styles.evoGenderMale,
+          ]}
+        >
+          {pokemon.gender === 'female' ? '♀ Female' : '♂ Male'}
+        </Text>
+      ) : null}
     </>
   );
 
@@ -143,38 +206,130 @@ function EvolutionNode({ pokemon, currentName, onPress }) {
   );
 }
 
-function EvolutionSection({ stages, linear, total, currentName, onPress }) {
+function FormCard({ pokemon, currentName, onPress }) {
+  const isCurrent = pokemon.name === currentName;
+  const content = (
+    <>
+      <RemoteImage source={getPokemonSpriteUrl(pokemon.id)} size={52} />
+      <Text style={styles.formName} numberOfLines={2}>
+        {pokemon.label}
+      </Text>
+    </>
+  );
+
+  if (isCurrent) {
+    return <View style={[styles.formCard, styles.formCardCurrent]}>{content}</View>;
+  }
+
+  return (
+    <Pressable
+      onPress={() => onPress(pokemon.name)}
+      style={({ pressed }) => [styles.formCard, pressed && styles.evoNodePressed]}
+    >
+      {content}
+    </Pressable>
+  );
+}
+
+function FormsModal({ visible, varieties, currentName, onClose, onPress }) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalRoot}>
+        <Pressable style={styles.modalBackdrop} onPress={onClose} />
+        <View style={styles.modalSheet}>
+          <View style={styles.formsHeader}>
+            <Text style={styles.sectionTitle}>All forms</Text>
+            <Pressable
+              onPress={onClose}
+              hitSlop={8}
+              accessibilityLabel="Close forms"
+              style={styles.modalClose}
+            >
+              <MaterialCommunityIcons name="close" size={18} color={colors.text} />
+            </Pressable>
+          </View>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.formsGrid}
+          >
+            {varieties.map((item) => (
+              <FormCard
+                key={item.id}
+                pokemon={item}
+                currentName={currentName}
+                onPress={onPress}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function FormsSection({ varieties, currentName, onPress, onSeeAll }) {
+  if (!varieties || varieties.length <= 1) return null;
+
+  const ordered = [
+    ...varieties.filter((item) => item.name === currentName),
+    ...varieties.filter((item) => item.name !== currentName),
+  ];
+
+  return (
+    <View style={styles.section}>
+      <View style={styles.formsHeader}>
+        <Text style={styles.sectionTitle}>Forms</Text>
+        <Pressable
+          onPress={onSeeAll}
+          hitSlop={8}
+          accessibilityLabel="See all forms"
+          style={styles.formsSeeAll}
+        >
+          <Text style={styles.formsCount}>{varieties.length}</Text>
+          <Text style={styles.formsSeeAllText}>See all</Text>
+        </Pressable>
+      </View>
+      <ScrollView
+        horizontal
+        nestedScrollEnabled
+        directionalLockEnabled
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.formsRow}
+        style={styles.formsScroller}
+      >
+        {ordered.map((item) => (
+          <FormCard
+            key={item.id}
+            pokemon={item}
+            currentName={currentName}
+            onPress={onPress}
+          />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function EvolutionSection({ stages, total, currentName, onPress }) {
   if (!stages) {
     return <ActivityIndicator color={colors.primary} />;
   }
 
   if (total <= 1) {
-    return <Text style={styles.meta}>Este Pokémon no evoluciona</Text>;
-  }
-
-  if (linear) {
-    return (
-      <View style={styles.evoLinear}>
-        {stages.map((stage, index) => (
-          <View key={stage[0].id} style={styles.evoLinearItem}>
-            {index > 0 ? <Text style={styles.evoArrow}>→</Text> : null}
-            <EvolutionNode
-              pokemon={stage[0]}
-              currentName={currentName}
-              onPress={onPress}
-            />
-          </View>
-        ))}
-      </View>
-    );
+    return <Text style={styles.meta}>This Pokémon does not evolve</Text>;
   }
 
   return (
     <View style={styles.evoTree}>
       {stages.map((stage, index) => (
-        <View key={stage.map((item) => item.id).join('-')}>
-          {index > 0 ? <Text style={styles.evoDown}>↓</Text> : null}
-          <View style={styles.evoBranch}>
+        <View key={stage.map((item) => item.id).join('-')} style={styles.evoTreeItem}>
+          {index > 0 ? <Text style={styles.evoArrow}>→</Text> : null}
+          <View style={stage.length > 1 ? styles.evoColumn : undefined}>
             {stage.map((item) => (
               <EvolutionNode
                 key={item.id}
@@ -195,11 +350,14 @@ export default function DetailScreen({ route, navigation }) {
   const [pokemon, setPokemon] = useState(null);
   const [matchups, setMatchups] = useState(null);
   const [evolution, setEvolution] = useState(null);
+  const [varieties, setVarieties] = useState(null);
   const [generation, setGeneration] = useState(null);
+  const [abilities, setAbilities] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showWeaknessTip, setShowWeaknessTip] = useState(false);
   const [showResistanceTip, setShowResistanceTip] = useState(false);
+  const [showFormsModal, setShowFormsModal] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -207,14 +365,17 @@ export default function DetailScreen({ route, navigation }) {
       setError(null);
       setMatchups(null);
       setEvolution(null);
+      setVarieties(null);
       setGeneration(null);
+      setAbilities(null);
       setShowWeaknessTip(false);
       setShowResistanceTip(false);
+      setShowFormsModal(false);
       const data = await getPokemonByNameOrId(nameOrId);
       setPokemon(data);
     } catch (err) {
       setPokemon(null);
-      setError(err.message || 'No se pudo cargar el detalle');
+      setError(err.message || 'Could not load details');
     } finally {
       setLoading(false);
     }
@@ -224,20 +385,53 @@ export default function DetailScreen({ route, navigation }) {
     load();
   }, [load]);
 
+  useLayoutEffect(() => {
+    const id = pokemon?.id;
+    const name = pokemon?.name ?? String(nameOrId);
+    navigation.setOptions({
+      title: '',
+      headerTitleAlign: 'center',
+      headerTitle: () => (
+        <View style={styles.headerBadge}>
+          {id != null ? (
+            <Text style={styles.headerId}>
+              #{String(id).padStart(3, '0')}
+            </Text>
+          ) : null}
+          <Text style={styles.headerName} numberOfLines={1}>
+            {name}
+          </Text>
+        </View>
+      ),
+    });
+  }, [navigation, pokemon, nameOrId]);
+
   useEffect(() => {
     if (!pokemon) return undefined;
     let cancelled = false;
 
     async function loadExtras() {
+      const visibleAbilities = (pokemon.abilities ?? []).filter(
+        (entry) => !entry.is_hidden,
+      );
+
       try {
         const typeNames = pokemon.types.map((entry) => entry.type.name);
-        const [typePayloads, species] = await Promise.all([
+        const [typePayloads, species, abilityPayloads] = await Promise.all([
           Promise.all(typeNames.map(getType)),
-          getPokemonSpecies(pokemon.id),
+          getPokemonSpecies(pokemon.species?.name ?? pokemon.id),
+          Promise.all(visibleAbilities.map((entry) => getAbility(entry.ability.name))),
         ]);
         if (cancelled) return;
         setMatchups(computeTypeMatchups(typePayloads));
         setGeneration(species.generation?.name ?? null);
+        setVarieties(parseVarieties(species));
+        setAbilities(
+          abilityPayloads.map((payload, index) => ({
+            id: visibleAbilities[index].ability.name,
+            ...parseAbilityInfo(payload),
+          })),
+        );
         const chain = await getEvolutionChainByUrl(species.evolution_chain.url);
         if (cancelled) return;
         setEvolution(parseEvolutionStages(chain.chain));
@@ -245,6 +439,15 @@ export default function DetailScreen({ route, navigation }) {
         if (!cancelled) {
           setMatchups((prev) => prev ?? { weaknesses: [], resistances: [] });
           setEvolution((prev) => prev ?? { stages: [], linear: true, total: 0 });
+          setVarieties((prev) => prev ?? []);
+          setAbilities((prev) =>
+            prev ??
+            visibleAbilities.map((entry) => ({
+              id: entry.ability.name,
+              name: entry.ability.name.replace(/-/g, ' '),
+              description: null,
+            })),
+          );
         }
       }
     }
@@ -263,29 +466,43 @@ export default function DetailScreen({ route, navigation }) {
   );
 
   if (loading) {
-    return <LoadingState message="Cargando detalle..." />;
+    return <LoadingState message="Loading details..." />;
   }
 
   if (error || !pokemon) {
-    return <ErrorState message={error || 'No encontrado'} onRetry={load} />;
+    return <ErrorState message={error || 'Not found'} onRetry={load} />;
   }
 
   const types = pokemon.types.map((entry) => entry.type.name);
   const stats = pokemon.stats;
   const image = getPokemonImageUrl(pokemon.id);
-  const abilities = pokemon.abilities ?? [];
+  const heightM = (pokemon.height / 10).toFixed(1);
+  const weightKg = (pokemon.weight / 10).toFixed(1);
+  const closeTips = () => {
+    setShowWeaknessTip(false);
+    setShowResistanceTip(false);
+  };
+  const anyTipOpen = showWeaknessTip || showResistanceTip;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        onScrollBeginDrag={closeTips}
+        keyboardShouldPersistTaps="handled"
+      >
       <View style={styles.hero}>
         {generation ? (
           <View style={styles.generationBadgeWrap}>
             <GenerationBadge generation={generation} />
           </View>
         ) : null}
-        <RemoteImage source={image} size={180} />
-        <Text style={styles.id}>#{String(pokemon.id).padStart(3, '0')}</Text>
-        <Text style={styles.name}>{pokemon.name}</Text>
+        <RemoteImage source={image} size={168} />
+        <Text style={styles.nameLine}>
+          <Text style={styles.id}>#{String(pokemon.id).padStart(3, '0')} </Text>
+          <Text style={styles.name}>{pokemon.name}</Text>
+        </Text>
         <View style={styles.typesRow}>
           {types.map((type) => (
             <TypeBadge key={type} type={type} />
@@ -293,55 +510,29 @@ export default function DetailScreen({ route, navigation }) {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Info</Text>
-        <Text style={styles.meta}>
-          Altura: {pokemon.height / 10} m · Peso: {pokemon.weight / 10} kg
-        </Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Habilidades</Text>
-        {abilities.map((entry) => (
-          <View key={entry.ability.name} style={styles.abilityRow}>
-            <Text style={styles.abilityName}>
-              {entry.ability.name.replace(/-/g, ' ')}
-            </Text>
-            {entry.is_hidden ? (
-              <Text style={styles.abilityHidden}>Oculta</Text>
-            ) : null}
-          </View>
-        ))}
-      </View>
-
       <MatchupSection
-        title="Debilidad a"
-        tip="Estos tipos le hacen más daño. Un ataque de alguno de ellos golpea más fuerte a este Pokémon."
+        title="Weak to"
+        tip="These types deal extra damage. An attack of one of these types hits this Pokémon harder."
         types={matchups?.weaknesses}
         loaded={Boolean(matchups)}
         tipOpen={showWeaknessTip}
-        onToggleTip={() => setShowWeaknessTip((open) => !open)}
+        onToggleTip={() => {
+          setShowResistanceTip(false);
+          setShowWeaknessTip((open) => !open);
+        }}
       />
 
       <MatchupSection
-        title="Resistencia a"
-        tip="Estos tipos le hacen menos daño. Un ataque de alguno de ellos golpea más débil a este Pokémon."
+        title="Resistant to"
+        tip="These types deal less damage. An attack of one of these types hits this Pokémon weaker."
         types={matchups?.resistances}
         loaded={Boolean(matchups)}
         tipOpen={showResistanceTip}
-        onToggleTip={() => setShowResistanceTip((open) => !open)}
+        onToggleTip={() => {
+          setShowWeaknessTip(false);
+          setShowResistanceTip((open) => !open);
+        }}
       />
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Evoluciones</Text>
-        <EvolutionSection
-          stages={evolution?.stages}
-          linear={evolution?.linear}
-          total={evolution?.total}
-          currentName={pokemon.name}
-          onPress={openPokemon}
-        />
-      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Stats</Text>
@@ -355,7 +546,74 @@ export default function DetailScreen({ route, navigation }) {
           ))}
         </View>
       </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Abilities</Text>
+        {abilities ? (
+          abilities.length ? (
+            abilities.map((ability) => (
+              <View key={ability.id} style={styles.abilityItem}>
+                <Text style={styles.abilityName}>{ability.name}</Text>
+                <Text style={styles.abilityText}>
+                  {ability.description || 'No description'}
+                </Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.meta}>None</Text>
+          )
+        ) : (
+          <ActivityIndicator color={colors.primary} />
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Evolutions</Text>
+        <EvolutionSection
+          stages={evolution?.stages}
+          total={evolution?.total}
+          currentName={pokemon.species?.name ?? pokemon.name}
+          onPress={openPokemon}
+        />
+      </View>
+
+      {varieties && varieties.length > 1 ? (
+        <FormsSection
+          varieties={varieties}
+          currentName={pokemon.name}
+          onPress={openPokemon}
+          onSeeAll={() => {
+            closeTips();
+            setShowFormsModal(true);
+          }}
+        />
+      ) : null}
+
+      <View style={styles.sizeSection}>
+        <Text style={styles.sizeLine}>Height {heightM} m</Text>
+        <Text style={styles.sizeSep}>·</Text>
+        <Text style={styles.sizeLine}>Weight {weightKg} kg</Text>
+      </View>
     </ScrollView>
+      {anyTipOpen ? (
+        <Pressable
+          collapsable={false}
+          style={styles.dismissLayer}
+          onPress={closeTips}
+          accessibilityLabel="Dismiss tooltip"
+        />
+      ) : null}
+      <FormsModal
+        visible={showFormsModal}
+        varieties={varieties ?? []}
+        currentName={pokemon.name}
+        onClose={() => setShowFormsModal(false)}
+        onPress={(name) => {
+          setShowFormsModal(false);
+          openPokemon(name);
+        }}
+      />
+    </View>
   );
 }
 
@@ -364,32 +622,71 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  scroll: {
+    flex: 1,
+  },
+  dismissLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,0.01)',
+  },
   content: {
     padding: 16,
     paddingBottom: 40,
-    gap: 16,
+    gap: 12,
   },
   hero: {
     backgroundColor: colors.surface,
     borderRadius: 20,
-    padding: 20,
+    padding: 14,
+    paddingTop: 38,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'visible',
   },
   generationBadgeWrap: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 10,
+    left: 10,
     zIndex: 1,
+    maxWidth: '70%',
   },
-  id: {
-    marginTop: 8,
+  headerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    maxWidth: 220,
+    backgroundColor: colors.background,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  headerId: {
     color: colors.textMuted,
     fontWeight: '700',
+    fontSize: 13,
+  },
+  headerName: {
+    color: colors.text,
+    fontWeight: '800',
+    fontSize: 15,
+    textTransform: 'capitalize',
+    flexShrink: 1,
+  },
+  nameLine: {
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  id: {
+    color: colors.textMuted,
+    fontWeight: '700',
+    fontSize: 22,
+    lineHeight: 28,
   },
   name: {
-    fontSize: 28,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: '800',
     color: colors.text,
     textTransform: 'capitalize',
@@ -397,7 +694,7 @@ const styles = StyleSheet.create({
   typesRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 10,
+    marginTop: 6,
   },
   section: {
     backgroundColor: colors.surface,
@@ -427,19 +724,28 @@ const styles = StyleSheet.create({
   },
   helpWrap: {
     position: 'relative',
-    width: 22,
-    height: 22,
+    width: 28,
+    height: 28,
     zIndex: 3,
     overflow: 'visible',
   },
-  helpBtn: {
+  helpWrapCompact: {
     width: 22,
     height: 22,
-    borderRadius: 11,
+  },
+  helpBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: colors.textMuted,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  helpBtnCompact: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
   },
   helpBtnOpen: {
     borderColor: colors.text,
@@ -454,17 +760,28 @@ const styles = StyleSheet.create({
   helpBtnTextOpen: {
     color: '#fff',
   },
-  tooltip: {
+  tooltipSlot: {
     position: 'absolute',
-    right: -8,
-    bottom: 30,
-    width: 228,
-    backgroundColor: colors.text,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    width: 220,
     zIndex: 10,
     elevation: 8,
+  },
+  tooltipSlotAbove: {
+    right: -8,
+    bottom: 28,
+    alignItems: 'flex-end',
+  },
+  tooltipSlotBelow: {
+    left: -8,
+    top: 36,
+    alignItems: 'flex-start',
+  },
+  tooltipBubble: {
+    backgroundColor: colors.text,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    maxWidth: 220,
     shadowColor: '#000',
     shadowOpacity: 0.18,
     shadowRadius: 8,
@@ -472,12 +789,18 @@ const styles = StyleSheet.create({
   },
   tooltipArrow: {
     position: 'absolute',
-    right: 12,
-    bottom: -5,
     width: 10,
     height: 10,
     backgroundColor: colors.text,
     transform: [{ rotate: '45deg' }],
+  },
+  tooltipArrowDown: {
+    right: 12,
+    bottom: -5,
+  },
+  tooltipArrowUp: {
+    left: 12,
+    top: -5,
   },
   tooltipText: {
     color: '#fff',
@@ -491,24 +814,24 @@ const styles = StyleSheet.create({
   wrapRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    margin: -4,
   },
-  abilityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  wrapItem: {
+    margin: 4,
+  },
+  abilityItem: {
+    gap: 4,
+    paddingTop: 4,
   },
   abilityName: {
     fontSize: 15,
     fontWeight: '700',
     color: colors.text,
-    textTransform: 'capitalize',
   },
-  abilityHidden: {
-    fontSize: 11,
-    fontWeight: '700',
+  abilityText: {
+    fontSize: 13,
+    lineHeight: 18,
     color: colors.textMuted,
-    textTransform: 'uppercase',
   },
   statsList: {
     gap: 10,
@@ -544,35 +867,25 @@ const styles = StyleSheet.create({
   dotEmpty: {
     backgroundColor: colors.border,
   },
-  evoLinear: {
+  evoTree: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  evoLinearItem: {
+  evoTreeItem: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   evoArrow: {
-    marginHorizontal: 4,
+    marginHorizontal: 6,
     color: colors.textMuted,
     fontSize: 18,
     fontWeight: '700',
   },
-  evoDown: {
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: 16,
-    marginVertical: 6,
-  },
-  evoTree: {
-    gap: 4,
-  },
-  evoBranch: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
+  evoColumn: {
+    flexDirection: 'column',
+    alignItems: 'center',
     gap: 8,
   },
   evoNode: {
@@ -598,5 +911,118 @@ const styles = StyleSheet.create({
     color: colors.text,
     textTransform: 'capitalize',
     textAlign: 'center',
+  },
+  evoGender: {
+    marginTop: 2,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  evoGenderMale: {
+    color: '#3B82F6',
+  },
+  evoGenderFemale: {
+    color: '#EC4899',
+  },
+  formsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  formsCount: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+    backgroundColor: colors.background,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  formsSeeAll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  formsSeeAllText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  modalSheet: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: 16,
+    maxHeight: '80%',
+    gap: 12,
+    zIndex: 1,
+  },
+  modalClose: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background,
+  },
+  formsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    paddingBottom: 8,
+  },
+  formsScroller: {
+    marginHorizontal: -16,
+  },
+  formsRow: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  formCard: {
+    width: 76,
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  formCardCurrent: {
+    borderColor: colors.primary,
+  },
+  formName: {
+    marginTop: 4,
+    minHeight: 28,
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.text,
+    textTransform: 'capitalize',
+    textAlign: 'center',
+  },
+  sizeSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  sizeLine: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.textMuted,
+  },
+  sizeSep: {
+    fontSize: 12,
+    color: colors.border,
   },
 });

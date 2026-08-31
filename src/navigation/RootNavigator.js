@@ -25,7 +25,7 @@ export default function RootNavigator() {
         <Stack.Screen
           name="Detail"
           component={DetailScreen}
-          options={{ title: 'Detalle' }}
+          options={{ title: '', headerTitleAlign: 'center' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

@@ -17,6 +17,7 @@ import {
   getPokemonList,
   getPokemonSpriteUrl,
 } from '../services/pokemon';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PokemonCard } from '../components/PokemonCard';
 import { LoadingState, ErrorState } from '../components/states';
 import { colors } from '../theme/colors';
@@ -29,7 +30,7 @@ const GRID_GAP = 10;
 const keyExtractor = (item) => String(item.id);
 
 function ListEmpty() {
-  return <Text style={styles.empty}>No hay Pokémon con ese nombre</Text>;
+  return <Text style={styles.empty}>No Pokémon with that name</Text>;
 }
 
 function LoadMoreFooter({ loading, error, onRetry }) {
@@ -47,7 +48,7 @@ function LoadMoreFooter({ loading, error, onRetry }) {
     <View style={styles.footer}>
       <Text style={styles.footerError}>{error}</Text>
       <Pressable onPress={onRetry} style={styles.footerRetry}>
-        <Text style={styles.footerRetryText}>Reintentar</Text>
+        <Text style={styles.footerRetryText}>Retry</Text>
       </Pressable>
     </View>
   );
@@ -133,7 +134,7 @@ export default function HomeScreen({ navigation }) {
       offsetRef.current = 0;
       await fetchPage({ nextOffset: 0, append: false });
     } catch (err) {
-      setError(err.message || 'No se pudo cargar la lista');
+      setError(err.message || 'Could not load the list');
     } finally {
       setLoading(false);
     }
@@ -156,7 +157,7 @@ export default function HomeScreen({ navigation }) {
       await fetchPage({ nextOffset: 0, append: false });
       loadCatalog().catch(() => {});
     } catch (err) {
-      setError(err.message || 'No se pudo refrescar');
+      setError(err.message || 'Could not refresh');
     } finally {
       setRefreshing(false);
     }
@@ -172,7 +173,7 @@ export default function HomeScreen({ navigation }) {
       setLoadMoreError(null);
       await fetchPage({ nextOffset: offsetRef.current, append: true });
     } catch (err) {
-      setLoadMoreError(err.message || 'No se pudo cargar más');
+      setLoadMoreError(err.message || 'Could not load more');
     } finally {
       loadingMoreRef.current = false;
       setLoadingMore(false);
@@ -210,7 +211,7 @@ export default function HomeScreen({ navigation }) {
   );
 
   if (loading) {
-    return <LoadingState message="Cargando Pokémon..." />;
+    return <LoadingState message="Loading Pokémon..." />;
   }
 
   if (error && pokemon.length === 0) {
@@ -221,16 +222,33 @@ export default function HomeScreen({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Pokédex</Text>
-        <Text style={styles.subtitle}>Explorá la PokeAPI</Text>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Buscar por nombre..."
-          placeholderTextColor={colors.textMuted}
-          style={styles.search}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+        <Text style={styles.subtitle}>Explore the PokeAPI</Text>
+        <View style={styles.searchWrap}>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by name..."
+            placeholderTextColor={colors.textMuted}
+            style={[styles.search, query.length > 0 && styles.searchWithClearRight]}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {query.length > 0 ? (
+            <Pressable
+              onPress={() => setQuery('')}
+              style={styles.searchClear}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <MaterialCommunityIcons
+                name="close-circle"
+                size={20}
+                color={colors.textMuted}
+              />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       <FlatList
@@ -284,6 +302,10 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: 8,
   },
+  searchWrap: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
   search: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -293,6 +315,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: colors.text,
+  },
+  searchWithClearRight: {
+    paddingRight: 42,
+  },
+  searchClear: {
+    position: 'absolute',
+    right: 12,
+    zIndex: 1,
+    elevation: 2,
+    height: '100%',
+    justifyContent: 'center',
   },
   list: {
     paddingHorizontal: LIST_PADDING,
