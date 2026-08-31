@@ -17,7 +17,8 @@ import {
   getPokemonList,
   getPokemonSpriteUrl,
 } from '../services/pokemon';
-import { PokemonCard, LoadingState, ErrorState } from '../components/PokemonCard';
+import { PokemonCard } from '../components/PokemonCard';
+import { LoadingState, ErrorState } from '../components/states';
 import { colors } from '../theme/colors';
 
 const PAGE_SIZE = 24;

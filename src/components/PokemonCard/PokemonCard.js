@@ -1,11 +1,5 @@
 import { createContext, useCallback, useContext, useMemo } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { colors } from '../../theme/colors';
 import RemoteImage from './RemoteImage';
 
@@ -20,7 +14,7 @@ function usePokemonCard(sectionName) {
 }
 
 function PokemonCard({ pokemon, onPress, children, style }) {
-  const value = useMemo(() => ({ pokemon, onPress }), [pokemon, onPress]);
+  const value = useMemo(() => ({ pokemon }), [pokemon]);
   const pressableStyle = useCallback(
     ({ pressed }) => [styles.card, pressed && styles.cardPressed, style],
     [style],
@@ -83,6 +77,7 @@ function Types({ style }) {
 }
 
 function Content({ children, style }) {
+  usePokemonCard('PokemonCard.Content');
   return <View style={[styles.content, style]}>{children}</View>;
 }
 
@@ -143,50 +138,3 @@ const styles = StyleSheet.create({
 });
 
 export { PokemonCard };
-
-export function LoadingState({ message = 'Cargando...' }) {
-  return (
-    <View style={stylesState.center}>
-      <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={stylesState.text}>{message}</Text>
-    </View>
-  );
-}
-
-export function ErrorState({ message = 'Algo salió mal', onRetry }) {
-  return (
-    <View style={stylesState.center}>
-      <Text style={stylesState.text}>{message}</Text>
-      {onRetry ? (
-        <Pressable onPress={onRetry} style={stylesState.retry}>
-          <Text style={stylesState.retryText}>Reintentar</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-const stylesState = StyleSheet.create({
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    padding: 24,
-  },
-  text: {
-    color: colors.textMuted,
-    fontSize: 15,
-    textAlign: 'center',
-  },
-  retry: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  retryText: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-});

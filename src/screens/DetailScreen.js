@@ -4,8 +4,8 @@ import {
   getPokemonByNameOrId,
   getPokemonImageUrl,
 } from '../services/pokemon';
-import { LoadingState, ErrorState } from '../components/PokemonCard';
-import RemoteImage from '../components/PokemonCard/RemoteImage';
+import { LoadingState, ErrorState } from '../components/states';
+import { RemoteImage } from '../components/PokemonCard';
 import { colors } from '../theme/colors';
 
 export default function DetailScreen({ route }) {
