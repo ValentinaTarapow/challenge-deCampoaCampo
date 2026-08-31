@@ -11,15 +11,14 @@ import {
   View,
   RefreshControl,
   Keyboard,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  GENERATIONS,
   REGIONS,
   getPokemonCatalog,
   getPokemonIdFromUrl,
   getPokemonList,
-  getPokemonNamesByGeneration,
   getPokemonNamesByRegion,
   getPokemonNamesByType,
   getPokemonSpriteUrl,
@@ -31,6 +30,8 @@ import {
   EMPTY_FILTERS,
   FilterSheet,
   countActiveFilters,
+  createEmptyFilters,
+  normalizeFilters,
 } from '../components/FilterSheet';
 import { colors } from '../theme/colors';
 
@@ -74,6 +75,16 @@ function ActiveFilterChip({ label, onRemove }) {
       <MaterialCommunityIcons name="close" size={14} color={colors.primary} />
     </Pressable>
   );
+}
+
+async function unionNameSets(ids, loader) {
+  if (!ids?.length) return null;
+  const sets = await Promise.all(ids.map(loader));
+  const names = new Set();
+  sets.forEach((set) => {
+    set.forEach((name) => names.add(name));
+  });
+  return names;
 }
 
 function matchesSearch(item, term) {
@@ -150,11 +161,12 @@ export default function HomeScreen({ navigation }) {
   const loadingMoreRef = useRef(false);
   const offsetRef = useRef(0);
 
+  const activeFilters = useMemo(() => normalizeFilters(filters), [filters]);
   const isSearching = query.trim().length > 0;
-  const activeFilterCount = countActiveFilters(filters);
+  const activeFilterCount = countActiveFilters(activeFilters);
   const hasFilters = activeFilterCount > 0;
   const isFilteredView = isSearching || hasFilters;
-  const filterKey = `${filters.region ?? ''}|${filters.generation ?? ''}|${filters.type ?? ''}`;
+  const filterKey = `${[...activeFilters.regions].sort().join(',')}|${[...activeFilters.types].sort().join(',')}`;
 
   const mapResults = useCallback((results) => {
     return results.map((item) => {
@@ -240,18 +252,14 @@ export default function HomeScreen({ navigation }) {
       try {
         setFilterLoading(true);
         setFilterError(null);
-        const [typeNames, generationNames, regionNames] = await Promise.all([
-          filters.type ? getPokemonNamesByType(filters.type) : null,
-          filters.generation
-            ? getPokemonNamesByGeneration(filters.generation)
-            : null,
-          filters.region ? getPokemonNamesByRegion(filters.region) : null,
+        const [typeNames, regionNames] = await Promise.all([
+          unionNameSets(activeFilters.types, getPokemonNamesByType),
+          unionNameSets(activeFilters.regions, getPokemonNamesByRegion),
         ]);
         if (!cancelled) {
           setFilterSets({
             key: filterKey,
             type: typeNames,
-            generation: generationNames,
             region: regionNames,
           });
         }
@@ -269,7 +277,7 @@ export default function HomeScreen({ navigation }) {
     return () => {
       cancelled = true;
     };
-  }, [filters, filterKey, filterRetry, hasFilters]);
+  }, [activeFilters, filterKey, filterRetry, hasFilters]);
 
   const loadMore = useCallback(async () => {
     if (isFilteredView || !hasMore || loadingMoreRef.current || loading || refreshing) {
@@ -301,9 +309,6 @@ export default function HomeScreen({ navigation }) {
     const source = catalog.length ? catalog : pokemon;
     return source.filter((item) => {
       if (activeSets?.type && !activeSets.type.has(item.name)) return false;
-      if (activeSets?.generation && !activeSets.generation.has(item.name)) {
-        return false;
-      }
       if (activeSets?.region && !activeSets.region.has(item.name)) return false;
       if (term && !matchesSearch(item, term)) return false;
       return true;
@@ -317,12 +322,22 @@ export default function HomeScreen({ navigation }) {
   const listData = showFilterSpinner || filterError ? [] : filtered;
 
   const onApplyFilters = useCallback((next) => {
-    setFilters(next);
+    setFilters(normalizeFilters(next));
     setFiltersOpen(false);
   }, []);
 
-  const clearFilter = useCallback((key) => {
-    setFilters((prev) => ({ ...prev, [key]: null }));
+  const clearFilter = useCallback((key, id) => {
+    setFilters((prev) => {
+      const current = normalizeFilters(prev);
+      return {
+        ...current,
+        [key]: current[key].filter((item) => item !== id),
+      };
+    });
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
+    setFilters(createEmptyFilters());
   }, []);
 
   const onPressPokemon = useCallback(
@@ -361,140 +376,150 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <Image
-          source={require('../../assets/pokedex-logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-          accessibilityLabel="PokéDex logo"
-        />
-        <View style={styles.searchRow}>
-          <View style={styles.searchWrap}>
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search by name or #id..."
-              placeholderTextColor={colors.textMuted}
-              style={[styles.search, query.length > 0 && styles.searchWithClearRight]}
-              autoCapitalize="none"
-              autoCorrect={false}
+          <View style={styles.header}>
+            <Image
+              source={require('../../assets/pokedex-logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+              accessibilityLabel="PokéDex logo"
             />
-            {query.length > 0 ? (
+            <View style={styles.searchRow}>
+              <View style={styles.searchWrap}>
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Search by name or #id..."
+                  placeholderTextColor={colors.textMuted}
+                  style={[styles.search, query.length > 0 && styles.searchWithClearRight]}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {query.length > 0 ? (
+                  <Pressable
+                    onPress={() => setQuery('')}
+                    style={styles.searchClear}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear search"
+                  >
+                    <MaterialCommunityIcons
+                      name="close-circle"
+                      size={20}
+                      color={colors.textMuted}
+                    />
+                  </Pressable>
+                ) : null}
+              </View>
               <Pressable
-                onPress={() => setQuery('')}
-                style={styles.searchClear}
-                hitSlop={8}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setFiltersOpen(true);
+                }}
+                style={[styles.filterBtn, hasFilters && styles.filterBtnActive]}
                 accessibilityRole="button"
-                accessibilityLabel="Clear search"
+                accessibilityLabel="Open filters"
               >
                 <MaterialCommunityIcons
-                  name="close-circle"
-                  size={20}
-                  color={colors.textMuted}
+                  name="filter-variant"
+                  size={22}
+                  color={hasFilters ? '#fff' : colors.text}
                 />
+                {hasFilters ? (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                  </View>
+                ) : null}
               </Pressable>
-            ) : null}
-          </View>
-          <Pressable
-            onPress={() => {
-              Keyboard.dismiss();
-              setFiltersOpen(true);
-            }}
-            style={[styles.filterBtn, hasFilters && styles.filterBtnActive]}
-            accessibilityRole="button"
-            accessibilityLabel="Open filters"
-          >
-            <MaterialCommunityIcons
-              name="filter-variant"
-              size={22}
-              color={hasFilters ? '#fff' : colors.text}
-            />
-            {hasFilters ? (
-              <View style={styles.filterBadge}>
-                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-              </View>
-            ) : null}
-          </Pressable>
-        </View>
-        {hasFilters ? (
-          <View style={styles.activeFilters}>
-            {filters.region ? (
-              <ActiveFilterChip
-                label={REGIONS.find((item) => item.id === filters.region)?.label}
-                onRemove={() => clearFilter('region')}
-              />
-            ) : null}
-            {filters.generation ? (
-              <ActiveFilterChip
-                label={
-                  GENERATIONS.find((item) => item.id === filters.generation)
-                    ?.label
-                }
-                onRemove={() => clearFilter('generation')}
-              />
-            ) : null}
-            {filters.type ? (
-              <ActiveFilterChip
-                label={filters.type}
-                onRemove={() => clearFilter('type')}
-              />
-            ) : null}
-          </View>
-        ) : null}
-      </View>
-
-      <FilterSheet
-        visible={filtersOpen}
-        value={filters}
-        onApply={onApplyFilters}
-        onClose={() => setFiltersOpen(false)}
-      />
-
-      <FlatList
-        data={listData}
-        numColumns={NUM_COLUMNS}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        contentContainerStyle={styles.list}
-        columnWrapperStyle={listData.length ? styles.row : undefined}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        onEndReached={isFilteredView ? undefined : onEndReached}
-        onEndReachedThreshold={0.4}
-        initialNumToRender={12}
-        maxToRenderPerBatch={9}
-        removeClippedSubviews
-        ListEmptyComponent={
-          showFilterSpinner ? (
-            <View style={styles.listStatus}>
-              <ActivityIndicator color={colors.primary} />
             </View>
-          ) : filterError ? (
-            <View style={styles.listStatus}>
-              <Text style={styles.footerError}>{filterError}</Text>
-              <Pressable
-                onPress={() => setFilterRetry((n) => n + 1)}
-                style={styles.footerRetry}
+          {hasFilters ? (
+            <View style={styles.activeFilters}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.activeFiltersScroller}
+                contentContainerStyle={styles.activeFiltersScroll}
+                keyboardShouldPersistTaps="handled"
               >
-                <Text style={styles.footerRetryText}>Retry</Text>
+                {activeFilters.regions.map((regionId) => (
+                  <ActiveFilterChip
+                    key={`region-${regionId}`}
+                    label={REGIONS.find((item) => item.id === regionId)?.filterLabel}
+                    onRemove={() => clearFilter('regions', regionId)}
+                  />
+                ))}
+                {activeFilters.types.map((type) => (
+                  <ActiveFilterChip
+                    key={`type-${type}`}
+                    label={type}
+                    onRemove={() => clearFilter('types', type)}
+                  />
+                ))}
+              </ScrollView>
+              <Pressable
+                onPress={clearAllFilters}
+                style={styles.clearAllBtn}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Clear all filters"
+              >
+                <Text style={styles.clearAllText}>Clear all</Text>
               </Pressable>
             </View>
-          ) : (
-            <ListEmpty searching={isSearching} filtering={hasFilters} />
-          )
-        }
-        ListFooterComponent={
-          isFilteredView ? null : (
-            <LoadMoreFooter
-              loading={loadingMore}
-              error={loadMoreError}
-              onRetry={loadMore}
-            />
-          )
-        }
-      />
+          ) : null}
+          </View>
+
+          <FilterSheet
+            visible={filtersOpen}
+            value={filters}
+            onApply={onApplyFilters}
+            onClose={() => setFiltersOpen(false)}
+          />
+
+          <FlatList
+            data={listData}
+            numColumns={NUM_COLUMNS}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
+            contentContainerStyle={styles.list}
+            columnWrapperStyle={listData.length ? styles.row : undefined}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            onEndReached={isFilteredView ? undefined : onEndReached}
+            onEndReachedThreshold={0.4}
+            initialNumToRender={12}
+            maxToRenderPerBatch={9}
+            removeClippedSubviews
+            ListEmptyComponent={
+              showFilterSpinner ? (
+                <View style={styles.listStatus}>
+                  <ActivityIndicator color={colors.primary} />
+                </View>
+              ) : filterError ? (
+                <View style={styles.listStatus}>
+                  <Text style={styles.footerError}>{filterError}</Text>
+                  <Pressable
+                    onPress={() => setFilterRetry((n) => n + 1)}
+                    style={styles.footerRetry}
+                  >
+                    <Text style={styles.footerRetryText}>Retry</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <ListEmpty searching={isSearching} filtering={hasFilters} />
+              )
+            }
+            ListFooterComponent={
+              isFilteredView ? null : (
+                <LoadMoreFooter
+                  loading={loadingMore}
+                  error={loadMoreError}
+                  onRetry={loadMore}
+                />
+              )
+            }
+          />
     </Screen>
   );
 }
@@ -588,14 +613,25 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   activeFilters: {
+    alignSelf: 'stretch',
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
     marginTop: 10,
+  },
+  activeFiltersScroller: {
+    flex: 1,
+  },
+  activeFiltersScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 4,
   },
   activeChip: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
     gap: 4,
     paddingLeft: 10,
     paddingRight: 8,
@@ -604,6 +640,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.primary,
+  },
+  clearAllBtn: {
+    flexShrink: 0,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+  },
+  clearAllText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
   },
   activeChipText: {
     fontSize: 12,

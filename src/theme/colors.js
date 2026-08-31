@@ -1,7 +1,8 @@
 export const colors = {
-  background: '#F4F6F8',
+  background: '#EAF4F9',
+  imageBackground: '#F6FBFD',
   surface: '#FFFFFF',
-  safeBottom: '#FFFFFF',
+  safeBottom: '#EAF4F9',
   text: '#1A1A1A',
   textMuted: '#6B7280',
   primary: '#EF5350',

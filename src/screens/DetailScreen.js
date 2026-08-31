@@ -1048,7 +1048,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.background,
+    backgroundColor: colors.imageBackground,
   },
   formCardCurrent: {
     borderColor: colors.primary,

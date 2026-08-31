@@ -9,32 +9,36 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import {
-  GENERATIONS,
-  POKEMON_TYPES,
-  REGIONS,
-  isCompatibleRegionGeneration,
-} from '../services/pokemon';
+import { POKEMON_TYPES, REGIONS } from '../services/pokemon';
 import { colors, onColor } from '../theme/colors';
 
 export const EMPTY_FILTERS = {
-  region: null,
-  generation: null,
-  type: null,
+  regions: [],
+  types: [],
 };
 
+export function createEmptyFilters() {
+  return { regions: [], types: [] };
+}
+
+function asList(value) {
+  const list = Array.isArray(value) ? value.filter(Boolean) : value ? [value] : [];
+  return [...new Set(list)];
+}
+
+export function normalizeFilters(filters) {
+  return {
+    regions: asList(filters?.regions ?? filters?.region),
+    types: asList(filters?.types ?? filters?.type),
+  };
+}
+
 export function countActiveFilters(filters) {
-  return [filters?.region, filters?.generation, filters?.type].filter(Boolean)
-    .length;
+  const next = normalizeFilters(filters);
+  return next.regions.length + next.types.length;
 }
 
-function sanitizeFilters(filters) {
-  const next = { ...EMPTY_FILTERS, ...filters };
-  if (isCompatibleRegionGeneration(next.region, next.generation)) return next;
-  return { ...next, region: null };
-}
-
-function Chip({ label, selected, color, disabled, onPress }) {
+function Chip({ label, selected, color, onPress }) {
   const backgroundColor = selected ? color || colors.primary : colors.background;
   const borderColor = selected ? backgroundColor : colors.border;
   const textColor = selected ? onColor(backgroundColor) : colors.text;
@@ -42,14 +46,9 @@ function Chip({ label, selected, color, disabled, onPress }) {
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
-      style={[
-        styles.chip,
-        { backgroundColor, borderColor },
-        disabled && styles.chipDisabled,
-      ]}
+      style={[styles.chip, { backgroundColor, borderColor }]}
       accessibilityRole="button"
-      accessibilityState={{ selected, disabled }}
+      accessibilityState={{ selected }}
     >
       <Text style={[styles.chipText, { color: textColor }]}>{label}</Text>
     </Pressable>
@@ -67,17 +66,20 @@ function Section({ title, children }) {
 
 export function FilterSheet({ visible, value, onApply, onClose }) {
   const insets = useSafeAreaInsets();
-  const [draft, setDraft] = useState(value ?? EMPTY_FILTERS);
+  const [draft, setDraft] = useState(() => normalizeFilters(value));
 
   useEffect(() => {
-    if (visible) setDraft(sanitizeFilters(value ?? EMPTY_FILTERS));
+    if (visible) setDraft(normalizeFilters(value));
   }, [visible, value]);
 
-  const toggle = (key, id) => {
-    setDraft((prev) => ({
-      ...prev,
-      [key]: prev[key] === id ? null : id,
-    }));
+  const toggleMany = (key, id) => {
+    setDraft((prev) => {
+      const list = prev[key] ?? [];
+      const next = list.includes(id)
+        ? list.filter((item) => item !== id)
+        : [...list, id];
+      return { ...prev, [key]: next };
+    });
   };
 
   const activeCount = countActiveFilters(draft);
@@ -112,27 +114,10 @@ export function FilterSheet({ visible, value, onApply, onClose }) {
               {REGIONS.map((region) => (
                 <Chip
                   key={region.id}
-                  label={region.label}
-                  selected={draft.region === region.id}
-                  disabled={
-                    !isCompatibleRegionGeneration(region.id, draft.generation)
-                  }
-                  onPress={() => toggle('region', region.id)}
-                />
-              ))}
-            </Section>
-
-            <Section title="Generation">
-              {GENERATIONS.map((generation) => (
-                <Chip
-                  key={generation.id}
-                  label={generation.label}
-                  selected={draft.generation === generation.id}
-                  color={colors.generations[generation.id]}
-                  disabled={
-                    !isCompatibleRegionGeneration(draft.region, generation.id)
-                  }
-                  onPress={() => toggle('generation', generation.id)}
+                  label={region.filterLabel}
+                  selected={draft.regions.includes(region.id)}
+                  color={colors.generations[region.generation]}
+                  onPress={() => toggleMany('regions', region.id)}
                 />
               ))}
             </Section>
@@ -142,9 +127,9 @@ export function FilterSheet({ visible, value, onApply, onClose }) {
                 <Chip
                   key={type}
                   label={type}
-                  selected={draft.type === type}
+                  selected={draft.types.includes(type)}
                   color={colors.types[type]}
-                  onPress={() => toggle('type', type)}
+                  onPress={() => toggleMany('types', type)}
                 />
               ))}
             </Section>
@@ -152,7 +137,7 @@ export function FilterSheet({ visible, value, onApply, onClose }) {
 
           <View style={styles.footer}>
             <Pressable
-              onPress={() => setDraft(EMPTY_FILTERS)}
+              onPress={() => setDraft(createEmptyFilters())}
               style={styles.clearBtn}
               accessibilityRole="button"
               accessibilityLabel="Clear filters"
@@ -160,7 +145,7 @@ export function FilterSheet({ visible, value, onApply, onClose }) {
               <Text style={styles.clearText}>Clear</Text>
             </Pressable>
             <Pressable
-              onPress={() => onApply(sanitizeFilters(draft))}
+              onPress={() => onApply(normalizeFilters(draft))}
               style={styles.applyBtn}
               accessibilityRole="button"
               accessibilityLabel="Apply filters"
@@ -237,9 +222,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
-  },
-  chipDisabled: {
-    opacity: 0.35,
   },
   chipText: {
     fontSize: 13,

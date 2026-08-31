@@ -172,10 +172,9 @@ export const POKEMON_TYPES = [
   'fairy',
 ];
 
-export const GENERATIONS = Object.keys(GENERATION_REGIONS).map((id) => ({
-  id,
-  label: `Gen ${id.replace(/^generation-/, '').toUpperCase()}`,
-}));
+function generationRoman(generation) {
+  return generation.replace(/^generation-/, '').toUpperCase();
+}
 
 export const REGIONS = [
   { id: 'kanto', label: 'Kanto', generation: 'generation-i', pokedexes: ['kanto'] },
@@ -203,13 +202,10 @@ export const REGIONS = [
     generation: 'generation-ix',
     pokedexes: ['paldea', 'kitakami', 'blueberry'],
   },
-];
-
-export function isCompatibleRegionGeneration(regionId, generationId) {
-  if (!regionId || !generationId) return true;
-  const region = REGIONS.find((item) => item.id === regionId);
-  return region?.generation === generationId;
-}
+].map((region) => ({
+  ...region,
+  filterLabel: `${region.label} (Gen ${generationRoman(region.generation)})`,
+}));
 
 export function getGenerationLabel(generationName) {
   if (!generationName) return null;
@@ -236,11 +232,6 @@ async function cachedNameSet(key, loader) {
   return pending;
 }
 
-export async function getGeneration(nameOrId) {
-  const { data } = await apiClient.get(`/generation/${nameOrId}`);
-  return data;
-}
-
 export async function getPokedex(nameOrId) {
   const { data } = await apiClient.get(`/pokedex/${nameOrId}`);
   return data;
@@ -250,13 +241,6 @@ export async function getPokemonNamesByType(type) {
   return cachedNameSet(`type:${type}`, async () => {
     const data = await getType(type);
     return new Set((data.pokemon ?? []).map((entry) => entry.pokemon.name));
-  });
-}
-
-export async function getPokemonNamesByGeneration(generation) {
-  return cachedNameSet(`gen:${generation}`, async () => {
-    const data = await getGeneration(generation);
-    return new Set((data.pokemon_species ?? []).map((item) => item.name));
   });
 }
 

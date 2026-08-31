@@ -53,7 +53,7 @@ export default function RemoteImage({ source, size = 72, style }) {
 
 const styles = StyleSheet.create({
   wrap: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.imageBackground,
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.imageBackground,
   },
   fallback: {
     width: '46%',
