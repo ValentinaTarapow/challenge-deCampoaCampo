@@ -198,7 +198,7 @@ function EvolutionNode({ pokemon, currentName, onPress, shiny }) {
 
   return (
     <Pressable
-      onPress={() => onPress(pokemon.name)}
+      onPress={() => onPress(pokemon)}
       style={({ pressed }) => [styles.evoNode, pressed && styles.evoNodePressed]}
     >
       {content}
@@ -223,7 +223,7 @@ function FormCard({ pokemon, currentName, onPress, shiny }) {
 
   return (
     <Pressable
-      onPress={() => onPress(pokemon.name)}
+      onPress={() => onPress(pokemon)}
       style={({ pressed }) => [styles.formCard, pressed && styles.evoNodePressed]}
     >
       {content}
@@ -349,7 +349,7 @@ function EvolutionSection({ stages, total, currentName, onPress, shiny }) {
 }
 
 export default function DetailScreen({ route, navigation }) {
-  const { nameOrId } = route.params;
+  const { nameOrId, id: paramId } = route.params;
   const [pokemon, setPokemon] = useState(null);
   const [matchups, setMatchups] = useState(null);
   const [evolution, setEvolution] = useState(null);
@@ -390,7 +390,7 @@ export default function DetailScreen({ route, navigation }) {
   }, [load]);
 
   useLayoutEffect(() => {
-    const id = pokemon?.id;
+    const id = pokemon?.id ?? paramId;
     const name = pokemon?.name ?? String(nameOrId);
     navigation.setOptions({
       title: '',
@@ -408,7 +408,7 @@ export default function DetailScreen({ route, navigation }) {
         </View>
       ),
     });
-  }, [navigation, pokemon, nameOrId]);
+  }, [navigation, pokemon, nameOrId, paramId]);
 
   useEffect(() => {
     if (!pokemon) return undefined;
@@ -463,8 +463,8 @@ export default function DetailScreen({ route, navigation }) {
   }, [pokemon]);
 
   const openPokemon = useCallback(
-    (name) => {
-      navigation.push('Detail', { nameOrId: name });
+    (item) => {
+      navigation.push('Detail', { nameOrId: item.name, id: item.id });
     },
     [navigation],
   );
@@ -627,9 +627,9 @@ export default function DetailScreen({ route, navigation }) {
         varieties={varieties ?? []}
         currentName={pokemon.name}
         onClose={() => setShowFormsModal(false)}
-        onPress={(name) => {
+        onPress={(item) => {
           setShowFormsModal(false);
-          openPokemon(name);
+          openPokemon(item);
         }}
         shiny={shiny}
       />

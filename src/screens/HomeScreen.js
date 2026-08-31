@@ -73,7 +73,7 @@ const PokemonGridItem = memo(function PokemonGridItem({
     <PokemonCard
       pokemon={item}
       style={{ width: cardWidth }}
-      onPress={() => onPress(item.name)}
+      onPress={() => onPress(item)}
     >
       <PokemonCard.Image size={cardWidth - 24} />
       <PokemonCard.Content>
@@ -203,8 +203,8 @@ export default function HomeScreen({ navigation }) {
   }, [pokemon, catalog, query]);
 
   const onPressPokemon = useCallback(
-    (name) => {
-      navigation.navigate('Detail', { nameOrId: name });
+    (item) => {
+      navigation.navigate('Detail', { nameOrId: item.name, id: item.id });
     },
     [navigation],
   );
