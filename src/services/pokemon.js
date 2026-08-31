@@ -151,10 +151,129 @@ const GENERATION_REGIONS = {
   'generation-ix': 'Paldea',
 };
 
+export const POKEMON_TYPES = [
+  'normal',
+  'fire',
+  'water',
+  'electric',
+  'grass',
+  'ice',
+  'fighting',
+  'poison',
+  'ground',
+  'flying',
+  'psychic',
+  'bug',
+  'rock',
+  'ghost',
+  'dragon',
+  'dark',
+  'steel',
+  'fairy',
+];
+
+export const GENERATIONS = Object.keys(GENERATION_REGIONS).map((id) => ({
+  id,
+  label: `Gen ${id.replace(/^generation-/, '').toUpperCase()}`,
+}));
+
+export const REGIONS = [
+  { id: 'kanto', label: 'Kanto', generation: 'generation-i', pokedexes: ['kanto'] },
+  { id: 'johto', label: 'Johto', generation: 'generation-ii', pokedexes: ['original-johto'] },
+  { id: 'hoenn', label: 'Hoenn', generation: 'generation-iii', pokedexes: ['hoenn'] },
+  { id: 'sinnoh', label: 'Sinnoh', generation: 'generation-iv', pokedexes: ['original-sinnoh'] },
+  { id: 'unova', label: 'Unova', generation: 'generation-v', pokedexes: ['original-unova'] },
+  {
+    id: 'kalos',
+    label: 'Kalos',
+    generation: 'generation-vi',
+    pokedexes: ['kalos-central', 'kalos-coastal', 'kalos-mountain'],
+  },
+  { id: 'alola', label: 'Alola', generation: 'generation-vii', pokedexes: ['original-alola'] },
+  {
+    id: 'galar',
+    label: 'Galar',
+    generation: 'generation-viii',
+    pokedexes: ['galar', 'isle-of-armor', 'crown-tundra'],
+  },
+  { id: 'hisui', label: 'Hisui', generation: 'generation-viii', pokedexes: ['hisui'] },
+  {
+    id: 'paldea',
+    label: 'Paldea',
+    generation: 'generation-ix',
+    pokedexes: ['paldea', 'kitakami', 'blueberry'],
+  },
+];
+
+export function isCompatibleRegionGeneration(regionId, generationId) {
+  if (!regionId || !generationId) return true;
+  const region = REGIONS.find((item) => item.id === regionId);
+  return region?.generation === generationId;
+}
+
 export function getGenerationLabel(generationName) {
   if (!generationName) return null;
   const region = GENERATION_REGIONS[generationName];
   const roman = generationName.replace(/^generation-/, '').toUpperCase();
   if (!region) return `Gen ${roman}`;
   return `${region} (Gen ${roman})`;
+}
+
+const filterNameCache = new Map();
+
+async function cachedNameSet(key, loader) {
+  if (filterNameCache.has(key)) return filterNameCache.get(key);
+  const pending = loader()
+    .then((set) => {
+      filterNameCache.set(key, Promise.resolve(set));
+      return set;
+    })
+    .catch((err) => {
+      filterNameCache.delete(key);
+      throw err;
+    });
+  filterNameCache.set(key, pending);
+  return pending;
+}
+
+export async function getGeneration(nameOrId) {
+  const { data } = await apiClient.get(`/generation/${nameOrId}`);
+  return data;
+}
+
+export async function getPokedex(nameOrId) {
+  const { data } = await apiClient.get(`/pokedex/${nameOrId}`);
+  return data;
+}
+
+export async function getPokemonNamesByType(type) {
+  return cachedNameSet(`type:${type}`, async () => {
+    const data = await getType(type);
+    return new Set((data.pokemon ?? []).map((entry) => entry.pokemon.name));
+  });
+}
+
+export async function getPokemonNamesByGeneration(generation) {
+  return cachedNameSet(`gen:${generation}`, async () => {
+    const data = await getGeneration(generation);
+    return new Set((data.pokemon_species ?? []).map((item) => item.name));
+  });
+}
+
+export async function getPokemonNamesByRegion(regionId) {
+  const region = REGIONS.find((item) => item.id === regionId);
+  if (!region) return new Set();
+
+  return cachedNameSet(`region:${regionId}`, async () => {
+    const dexes = await Promise.all(
+      region.pokedexes.map((name) => getPokedex(name)),
+    );
+    const names = new Set();
+    dexes.forEach((dex) => {
+      (dex.pokemon_entries ?? []).forEach((entry) => {
+        names.add(entry.pokemon_species.name);
+      });
+    });
+    return names;
+  });
 }
