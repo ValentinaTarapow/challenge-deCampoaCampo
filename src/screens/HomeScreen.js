@@ -1,5 +1,6 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
@@ -12,11 +13,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   getPokemonCatalog,
   getPokemonIdFromUrl,
+  getPokemonList,
   getPokemonSpriteUrl,
 } from '../services/pokemon';
 import { PokemonCard, LoadingState, ErrorState } from '../components/PokemonCard';
 import { colors } from '../theme/colors';
 
+const PAGE_SIZE = 24;
 const NUM_COLUMNS = 3;
 const LIST_PADDING = 16;
 const GRID_GAP = 10;
@@ -53,10 +56,17 @@ export default function HomeScreen({ navigation }) {
     (width - LIST_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
 
   const [pokemon, setPokemon] = useState([]);
+  const [catalog, setCatalog] = useState([]);
+  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
+  const loadingMoreRef = useRef(false);
+  const offsetRef = useRef(0);
+
+  const isSearching = query.trim().length > 0;
 
   const mapResults = useCallback((results) => {
     return results.map((item) => {
@@ -70,32 +80,55 @@ export default function HomeScreen({ navigation }) {
     });
   }, []);
 
+  const fetchPage = useCallback(
+    async ({ nextOffset = 0, append = false } = {}) => {
+      const data = await getPokemonList(PAGE_SIZE, nextOffset);
+      const mapped = mapResults(data.results);
+      setPokemon((prev) => {
+        if (!append) return mapped;
+        const existingIds = new Set(prev.map((item) => item.id));
+        const unique = mapped.filter((item) => !existingIds.has(item.id));
+        return unique.length ? [...prev, ...unique] : prev;
+      });
+      offsetRef.current = nextOffset + PAGE_SIZE;
+      setHasMore(Boolean(data.next));
+    },
+    [mapResults],
+  );
+
   const loadCatalog = useCallback(async () => {
     const data = await getPokemonCatalog();
-    setPokemon(mapResults(data.results));
+    setCatalog(mapResults(data.results));
   }, [mapResults]);
 
   const loadInitial = useCallback(async () => {
     try {
       setError(null);
       setLoading(true);
-      await loadCatalog();
+      offsetRef.current = 0;
+      await fetchPage({ nextOffset: 0, append: false });
     } catch (err) {
       setError(err.message || 'No se pudo cargar la lista');
     } finally {
       setLoading(false);
     }
-  }, [loadCatalog]);
+  }, [fetchPage]);
 
   useEffect(() => {
     loadInitial();
   }, [loadInitial]);
 
+  useEffect(() => {
+    loadCatalog().catch(() => {});
+  }, [loadCatalog]);
+
   const onRefresh = async () => {
     try {
       setRefreshing(true);
       setError(null);
-      await loadCatalog();
+      offsetRef.current = 0;
+      await fetchPage({ nextOffset: 0, append: false });
+      loadCatalog().catch(() => {});
     } catch (err) {
       setError(err.message || 'No se pudo refrescar');
     } finally {
@@ -103,11 +136,28 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  const onEndReached = useCallback(async () => {
+    if (isSearching || !hasMore || loadingMoreRef.current || loading || refreshing) {
+      return;
+    }
+    loadingMoreRef.current = true;
+    try {
+      setLoadingMore(true);
+      await fetchPage({ nextOffset: offsetRef.current, append: true });
+    } catch (err) {
+      setError(err.message || 'No se pudo cargar más');
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [fetchPage, hasMore, isSearching, loading, refreshing]);
+
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (!term) return pokemon;
-    return pokemon.filter((item) => item.name.toLowerCase().includes(term));
-  }, [pokemon, query]);
+    const source = catalog.length ? catalog : pokemon;
+    return source.filter((item) => item.name.toLowerCase().includes(term));
+  }, [pokemon, catalog, query]);
 
   const onPressPokemon = useCallback(
     (name) => {
@@ -162,11 +212,20 @@ export default function HomeScreen({ navigation }) {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onEndReached={isSearching ? undefined : onEndReached}
+        onEndReachedThreshold={0.4}
         initialNumToRender={12}
         maxToRenderPerBatch={9}
         windowSize={10}
         removeClippedSubviews
         ListEmptyComponent={ListEmpty}
+        ListFooterComponent={
+          loadingMore && !isSearching ? (
+            <View style={styles.footer}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : null
+        }
       />
     </SafeAreaView>
   );
@@ -209,6 +268,10 @@ const styles = StyleSheet.create({
   row: {
     gap: GRID_GAP,
     marginBottom: GRID_GAP,
+  },
+  footer: {
+    paddingVertical: 16,
+    alignItems: 'center',
   },
   empty: {
     textAlign: 'center',
