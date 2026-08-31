@@ -9,24 +9,18 @@ import {
   View,
 } from 'react-native';
 import {
-  getAbility,
-  getEvolutionChainByUrl,
   getPokemonByNameOrId,
   getPokemonImageUrl,
-  getPokemonSpecies,
   getPokemonSpriteUrl,
-  getType,
-  parseAbilityInfo,
-  parseEvolutionStages,
-  parseVarieties,
 } from '../services/pokemon';
-import { computeTypeMatchups } from '../services/matchups';
+import { getPokemonExtras } from '../services/pokemonDetail';
 import { LoadingState, ErrorState } from '../components/states';
 import { RemoteImage } from '../components/PokemonCard';
 import { TypeBadge } from '../components/TypeBadge';
 import { GenerationBadge } from '../components/GenerationBadge';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFavorites } from '../context/FavoritesContext';
 import { colors } from '../theme/colors';
 
 const STAT_MAX = 255;
@@ -384,6 +378,8 @@ function EvolutionSection({ stages, total, currentName, onPress, shiny }) {
 
 export default function DetailScreen({ route, navigation }) {
   const { nameOrId, id: paramId } = route.params;
+  const { isFavorite, toggleFavorite, getFavorite, persistFavoriteDetail } =
+    useFavorites();
   const [pokemon, setPokemon] = useState(null);
   const [matchups, setMatchups] = useState(null);
   const [evolution, setEvolution] = useState(null);
@@ -392,32 +388,58 @@ export default function DetailScreen({ route, navigation }) {
   const [abilities, setAbilities] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [fromCache, setFromCache] = useState(false);
   const [showWeaknessTip, setShowWeaknessTip] = useState(false);
   const [showResistanceTip, setShowResistanceTip] = useState(false);
   const [showFormsModal, setShowFormsModal] = useState(false);
   const [shiny, setShiny] = useState(false);
 
+  const applySnapshot = useCallback((detail) => {
+    setPokemon(detail.pokemon);
+    setMatchups(detail.matchups);
+    setGeneration(detail.generation);
+    setVarieties(detail.varieties);
+    setEvolution(detail.evolution);
+    setAbilities(detail.abilities);
+  }, []);
+
   const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+    const cached = getFavorite(paramId) || getFavorite(nameOrId);
+    const detail = cached?.detail;
+
+    setError(null);
+    setShowWeaknessTip(false);
+    setShowResistanceTip(false);
+    setShowFormsModal(false);
+
+    if (detail?.pokemon) {
+      applySnapshot(detail);
+      setFromCache(true);
+      setLoading(false);
+    } else {
+      setPokemon(null);
       setMatchups(null);
       setEvolution(null);
       setVarieties(null);
       setGeneration(null);
       setAbilities(null);
-      setShowWeaknessTip(false);
-      setShowResistanceTip(false);
-      setShowFormsModal(false);
+      setFromCache(false);
+      setLoading(true);
+    }
+
+    try {
       const data = await getPokemonByNameOrId(nameOrId);
       setPokemon(data);
+      setFromCache(false);
     } catch (err) {
-      setPokemon(null);
-      setError(err.message || 'Could not load details');
+      if (!detail?.pokemon) {
+        setPokemon(null);
+        setError(err.message || 'Could not load details');
+      }
     } finally {
       setLoading(false);
     }
-  }, [nameOrId]);
+  }, [applySnapshot, getFavorite, nameOrId, paramId]);
 
   useEffect(() => {
     load();
@@ -426,6 +448,7 @@ export default function DetailScreen({ route, navigation }) {
   useLayoutEffect(() => {
     const id = pokemon?.id ?? paramId;
     const name = pokemon?.name ?? String(nameOrId);
+    const favorited = id != null && isFavorite(id);
     navigation.setOptions({
       title: '',
       headerTitleAlign: 'center',
@@ -441,51 +464,52 @@ export default function DetailScreen({ route, navigation }) {
           </Text>
         </View>
       ),
+      headerRight: () =>
+        id != null ? (
+          <Pressable
+            onPress={() =>
+              toggleFavorite(
+                pokemon ?? {
+                  id,
+                  name,
+                  image: getPokemonSpriteUrl(id),
+                },
+              )
+            }
+            hitSlop={8}
+            style={styles.headerFavBtn}
+            accessibilityRole="button"
+            accessibilityLabel={favorited ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <MaterialCommunityIcons
+              name={favorited ? 'heart' : 'heart-outline'}
+              size={22}
+              color={colors.primary}
+            />
+          </Pressable>
+        ) : null,
     });
-  }, [navigation, pokemon, nameOrId, paramId]);
+  }, [navigation, pokemon, nameOrId, paramId, isFavorite, toggleFavorite]);
 
   useEffect(() => {
     if (!pokemon) return undefined;
     let cancelled = false;
 
     async function loadExtras() {
-      const visibleAbilities = (pokemon.abilities ?? []).filter(
-        (entry) => !entry.is_hidden,
-      );
-
       try {
-        const typeNames = pokemon.types.map((entry) => entry.type.name);
-        const [typePayloads, species, abilityPayloads] = await Promise.all([
-          Promise.all(typeNames.map(getType)),
-          getPokemonSpecies(pokemon.species?.name ?? pokemon.id),
-          Promise.all(visibleAbilities.map((entry) => getAbility(entry.ability.name))),
-        ]);
+        const extras = await getPokemonExtras(pokemon);
         if (cancelled) return;
-        setMatchups(computeTypeMatchups(typePayloads));
-        setGeneration(species.generation?.name ?? null);
-        setVarieties(parseVarieties(species));
-        setAbilities(
-          abilityPayloads.map((payload, index) => ({
-            id: visibleAbilities[index].ability.name,
-            ...parseAbilityInfo(payload),
-          })),
-        );
-        const chain = await getEvolutionChainByUrl(species.evolution_chain.url);
-        if (cancelled) return;
-        setEvolution(parseEvolutionStages(chain.chain));
+        setMatchups(extras.matchups);
+        setGeneration(extras.generation);
+        setVarieties(extras.varieties);
+        setAbilities(extras.abilities);
+        setEvolution(extras.evolution);
       } catch {
         if (!cancelled) {
           setMatchups((prev) => prev ?? { weaknesses: [], resistances: [] });
           setEvolution((prev) => prev ?? { stages: [], linear: true, total: 0 });
           setVarieties((prev) => prev ?? []);
-          setAbilities((prev) =>
-            prev ??
-            visibleAbilities.map((entry) => ({
-              id: entry.ability.name,
-              name: entry.ability.name.replace(/-/g, ' '),
-              description: null,
-            })),
-          );
+          setAbilities((prev) => prev ?? []);
         }
       }
     }
@@ -495,6 +519,27 @@ export default function DetailScreen({ route, navigation }) {
       cancelled = true;
     };
   }, [pokemon]);
+
+  useEffect(() => {
+    if (fromCache || !pokemon) return;
+    persistFavoriteDetail({
+      pokemon,
+      matchups,
+      generation,
+      varieties,
+      evolution,
+      abilities,
+    });
+  }, [
+    fromCache,
+    pokemon,
+    matchups,
+    generation,
+    varieties,
+    evolution,
+    abilities,
+    persistFavoriteDetail,
+  ]);
 
   const openPokemon = useCallback(
     (item) => {
@@ -521,8 +566,8 @@ export default function DetailScreen({ route, navigation }) {
     );
   }
 
-  const types = pokemon.types.map((entry) => entry.type.name);
-  const stats = pokemon.stats;
+  const types = (pokemon.types ?? []).map(typeName).filter(Boolean);
+  const stats = pokemon.stats ?? [];
   const image = getPokemonImageUrl(pokemon.id, { shiny });
   const heightM = (pokemon.height / 10).toFixed(1);
   const weightKg = (pokemon.weight / 10).toFixed(1);
@@ -540,6 +585,16 @@ export default function DetailScreen({ route, navigation }) {
         onScrollBeginDrag={closeTips}
         keyboardShouldPersistTaps="handled"
       >
+      {fromCache ? (
+        <View style={styles.offlineBanner}>
+          <MaterialCommunityIcons
+            name="wifi-off"
+            size={14}
+            color={colors.textMuted}
+          />
+          <Text style={styles.offlineText}>Saved favorite · available offline</Text>
+        </View>
+      ) : null}
       <View style={styles.hero}>
         {generation ? (
           <View style={styles.generationBadgeWrap}>
@@ -703,6 +758,23 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: 12,
   },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  offlineText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
   hero: {
     backgroundColor: colors.surface,
     borderRadius: 20,
@@ -759,6 +831,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textTransform: 'capitalize',
     flexShrink: 1,
+  },
+  headerFavBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
   },
   nameLine: {
     marginTop: 6,

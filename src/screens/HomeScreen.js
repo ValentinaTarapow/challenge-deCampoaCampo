@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,7 +13,6 @@ import {
   Keyboard,
   ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   REGIONS,
   getPokemonCatalog,
@@ -23,8 +22,15 @@ import {
   getPokemonNamesByType,
   getPokemonSpriteUrl,
 } from '../services/pokemon';
+import {
+  getCachedCatalog,
+  getLastList,
+  saveCachedCatalog,
+  saveLastList,
+} from '../services/storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { PokemonCard } from '../components/PokemonCard';
+import { PokemonGridItem } from '../components/PokemonGridItem';
+import { Screen } from '../components/Screen';
 import { LoadingState, ErrorState } from '../components/states';
 import {
   EMPTY_FILTERS,
@@ -42,25 +48,25 @@ const GRID_GAP = 10;
 
 const keyExtractor = (item) => String(item.id);
 
-function Screen({ children }) {
-  return (
-    <View style={styles.topSafe}>
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.screen}>{children}</View>
-      </SafeAreaView>
-      <SafeAreaView style={styles.bottomSafe} edges={['bottom']} />
-    </View>
-  );
-}
-
 function ListEmpty({ searching, filtering }) {
   const message =
     searching && filtering
-      ? 'No Pokémon match that search and filters'
+      ? 'Pokémon not found with those filters.'
       : filtering
-        ? 'No Pokémon match those filters'
-        : 'No Pokémon match that search';
-  return <Text style={styles.empty}>{message}</Text>;
+        ? 'No Pokémon match those filters.'
+        : 'Pokémon not found. Try another name or #id.';
+  return (
+    <View style={styles.empty}>
+      <Image
+        source={require('../../assets/whos-that-pokemon.png')}
+        style={styles.emptyImage}
+        resizeMode="contain"
+        accessibilityLabel="Who's that Pokémon silhouette"
+      />
+      <Text style={styles.emptyTitle}>Who's that Pokémon?</Text>
+      <Text style={styles.emptyText}>{message}</Text>
+    </View>
+  );
 }
 
 function ActiveFilterChip({ label, onRemove }) {
@@ -118,26 +124,6 @@ function LoadMoreFooter({ loading, error, onRetry }) {
   );
 }
 
-const PokemonGridItem = memo(function PokemonGridItem({
-  item,
-  cardWidth,
-  onPress,
-}) {
-  return (
-    <PokemonCard
-      pokemon={item}
-      style={{ width: cardWidth }}
-      onPress={() => onPress(item)}
-    >
-      <PokemonCard.Image size={cardWidth - 24} />
-      <PokemonCard.Content>
-        <PokemonCard.Id />
-        <PokemonCard.Name />
-      </PokemonCard.Content>
-    </PokemonCard>
-  );
-});
-
 export default function HomeScreen({ navigation }) {
   const { width } = useWindowDimensions();
   const cardWidth =
@@ -158,8 +144,10 @@ export default function HomeScreen({ navigation }) {
   const [filterError, setFilterError] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterRetry, setFilterRetry] = useState(0);
+  const [fromCache, setFromCache] = useState(false);
   const loadingMoreRef = useRef(false);
   const offsetRef = useRef(0);
+  const pokemonRef = useRef([]);
 
   const activeFilters = useMemo(() => normalizeFilters(filters), [filters]);
   const isSearching = query.trim().length > 0;
@@ -184,32 +172,67 @@ export default function HomeScreen({ navigation }) {
     async ({ nextOffset = 0, append = false } = {}) => {
       const data = await getPokemonList(PAGE_SIZE, nextOffset);
       const mapped = mapResults(data.results);
-      setPokemon((prev) => {
-        if (!append) return mapped;
-        const existingIds = new Set(prev.map((item) => item.id));
+      const nextOffsetValue = nextOffset + PAGE_SIZE;
+      const hasMorePages = Boolean(data.next);
+
+      let nextList;
+      if (!append) {
+        nextList = mapped;
+      } else {
+        const existingIds = new Set(pokemonRef.current.map((item) => item.id));
         const unique = mapped.filter((item) => !existingIds.has(item.id));
-        return unique.length ? [...prev, ...unique] : prev;
-      });
-      offsetRef.current = nextOffset + PAGE_SIZE;
-      setHasMore(Boolean(data.next));
+        nextList = unique.length ? [...pokemonRef.current, ...unique] : pokemonRef.current;
+      }
+
+      pokemonRef.current = nextList;
+      setPokemon(nextList);
+      offsetRef.current = nextOffsetValue;
+      setHasMore(hasMorePages);
+      saveLastList({
+        pokemon: nextList,
+        offset: nextOffsetValue,
+        hasMore: hasMorePages,
+      }).catch(() => {});
     },
     [mapResults],
   );
 
   const loadCatalog = useCallback(async () => {
+    const cached = await getCachedCatalog();
+    if (cached.length) setCatalog(cached);
+
     const data = await getPokemonCatalog();
-    setCatalog(mapResults(data.results));
+    const mapped = mapResults(data.results);
+    setCatalog(mapped);
+    saveCachedCatalog(mapped).catch(() => {});
   }, [mapResults]);
 
   const loadInitial = useCallback(async () => {
-    try {
-      setError(null);
-      setLoadMoreError(null);
+    setError(null);
+    setLoadMoreError(null);
+
+    const cached = await getLastList();
+    const hasCache = Boolean(cached?.pokemon?.length);
+
+    if (hasCache) {
+      pokemonRef.current = cached.pokemon;
+      setPokemon(cached.pokemon);
+      offsetRef.current = cached.offset ?? cached.pokemon.length;
+      setHasMore(cached.hasMore !== false);
+      setFromCache(true);
+      setLoading(false);
+    } else {
       setLoading(true);
+    }
+
+    try {
       offsetRef.current = 0;
       await fetchPage({ nextOffset: 0, append: false });
+      setFromCache(false);
     } catch (err) {
-      setError(err.message || 'Could not load the list');
+      if (!hasCache) {
+        setError(err.message || 'Could not load the list');
+      }
     } finally {
       setLoading(false);
     }
@@ -230,9 +253,14 @@ export default function HomeScreen({ navigation }) {
       setLoadMoreError(null);
       offsetRef.current = 0;
       await fetchPage({ nextOffset: 0, append: false });
+      setFromCache(false);
       loadCatalog().catch(() => {});
     } catch (err) {
-      setError(err.message || 'Could not refresh');
+      if (pokemon.length === 0) {
+        setError(err.message || 'Could not refresh');
+      } else {
+        setFromCache(true);
+      }
     } finally {
       setRefreshing(false);
     }
@@ -431,6 +459,16 @@ export default function HomeScreen({ navigation }) {
                 ) : null}
               </Pressable>
             </View>
+          {fromCache ? (
+            <View style={styles.offlineBanner}>
+              <MaterialCommunityIcons
+                name="wifi-off"
+                size={14}
+                color={colors.textMuted}
+              />
+              <Text style={styles.offlineText}>Showing last saved list</Text>
+            </View>
+          ) : null}
           {hasFilters ? (
             <View style={styles.activeFilters}>
               <ScrollView
@@ -525,20 +563,6 @@ export default function HomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  topSafe: {
-    flex: 1,
-    backgroundColor: colors.primary,
-  },
-  safe: {
-    flex: 1,
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  bottomSafe: {
-    backgroundColor: colors.safeBottom,
-  },
   header: {
     paddingHorizontal: LIST_PADDING,
     paddingTop: 20,
@@ -611,6 +635,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '800',
+  },
+  offlineBanner: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  offlineText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
   },
   activeFilters: {
     alignSelf: 'stretch',
@@ -693,9 +736,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingTop: 36,
+    gap: 8,
+  },
+  emptyImage: {
+    width: 240,
+    height: 188,
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
     textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    lineHeight: 20,
     color: colors.textMuted,
-    marginTop: 32,
-    fontSize: 15,
+    textAlign: 'center',
   },
 });

@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useMemo } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import RemoteImage from './RemoteImage';
 import { TypeBadge } from '../TypeBadge';
@@ -14,18 +15,46 @@ function usePokemonCard(sectionName) {
   return context;
 }
 
-function PokemonCard({ pokemon, onPress, children, style }) {
-  const value = useMemo(() => ({ pokemon }), [pokemon]);
-  const pressableStyle = useCallback(
-    ({ pressed }) => [styles.card, pressed && styles.cardPressed, style],
-    [style],
+function PokemonCard({
+  pokemon,
+  onPress,
+  children,
+  style,
+  isFavorite = false,
+  onToggleFavorite,
+}) {
+  const value = useMemo(
+    () => ({ pokemon, isFavorite, onToggleFavorite }),
+    [pokemon, isFavorite, onToggleFavorite],
   );
 
   return (
     <PokemonCardContext.Provider value={value}>
-      <Pressable onPress={onPress} style={pressableStyle}>
-        {children}
-      </Pressable>
+      <View style={[styles.card, style]}>
+        <Pressable
+          onPress={onPress}
+          style={({ pressed }) => [styles.cardPress, pressed && styles.cardPressed]}
+        >
+          {children}
+        </Pressable>
+        {onToggleFavorite ? (
+          <Pressable
+            onPress={onToggleFavorite}
+            hitSlop={8}
+            style={styles.favoriteBtn}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isFavorite ? 'Remove from favorites' : 'Add to favorites'
+            }
+          >
+            <MaterialCommunityIcons
+              name={isFavorite ? 'heart' : 'heart-outline'}
+              size={16}
+              color={isFavorite ? colors.primary : colors.textMuted}
+            />
+          </Pressable>
+        ) : null}
+      </View>
     </PokemonCardContext.Provider>
   );
 }
@@ -87,12 +116,28 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 8,
     alignItems: 'center',
-    gap: 6,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  cardPress: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 6,
+  },
   cardPressed: {
     opacity: 0.85,
+  },
+  favoriteBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    zIndex: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background,
   },
   content: {
     width: '100%',

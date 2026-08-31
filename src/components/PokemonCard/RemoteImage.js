@@ -1,28 +1,30 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
 import { colors } from '../../theme/colors';
+import { resolveImage } from '../../services/imageCache';
 
 const loadedUris = new Set();
 const FALLBACK_IMAGE = require('../../../assets/pokeball-placeholder.png');
 
 export default function RemoteImage({ source, size = 72, style }) {
+  const uri = resolveImage(source);
   const [loadedUri, setLoadedUri] = useState(() =>
-    loadedUris.has(source) ? source : null,
+    loadedUris.has(uri) ? uri : null,
   );
   const [failedUri, setFailedUri] = useState(null);
-  const ready = loadedUri === source;
-  const failed = failedUri === source;
-  const imageSource = useMemo(() => ({ uri: source }), [source]);
+  const ready = loadedUri === uri;
+  const failed = failedUri === uri;
+  const imageSource = useMemo(() => ({ uri }), [uri]);
 
   const onLoad = useCallback(() => {
-    loadedUris.add(source);
+    loadedUris.add(uri);
     setFailedUri(null);
-    setLoadedUri(source);
-  }, [source]);
+    setLoadedUri(uri);
+  }, [uri]);
 
   const onError = useCallback(() => {
-    setFailedUri(source);
-  }, [source]);
+    setFailedUri(uri);
+  }, [uri]);
 
   return (
     <View style={[{ width: size, height: size }, styles.wrap, style]}>
