@@ -28,6 +28,7 @@ export const colors = {
     'generation-vii': '#F5A623',
     'generation-viii': '#6C5CE7',
     'generation-ix': '#E63946',
+    hisui: '#C17A3A',
   },
   types: {
     normal: '#A0A29F',

@@ -116,7 +116,10 @@ export function FilterSheet({ visible, value, onApply, onClose }) {
                   key={region.id}
                   label={region.filterLabel}
                   selected={draft.regions.includes(region.id)}
-                  color={colors.generations[region.generation]}
+                  color={
+                    colors.generations[region.id] ||
+                    colors.generations[region.generation]
+                  }
                   onPress={() => toggleMany('regions', region.id)}
                 />
               ))}

@@ -9,6 +9,7 @@ import {
   parseAbilityInfo,
   parseEvolutionStages,
   parseVarieties,
+  resolvePokemonGeneration,
 } from './pokemon';
 import { computeTypeMatchups } from './matchups';
 
@@ -108,7 +109,7 @@ export async function getPokemonExtras(pokemon) {
 
   const extras = {
     matchups: computeTypeMatchups(typePayloads),
-    generation: species.generation?.name ?? null,
+    generation: resolvePokemonGeneration(pokemon, species),
     varieties: parseVarieties(species),
     abilities: abilityPayloads.map((payload, index) => ({
       id: visibleAbilities[index].ability.name,

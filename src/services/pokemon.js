@@ -229,6 +229,8 @@ export const REGIONS = [
 
 export function getGenerationLabel(generationName) {
   if (!generationName) return null;
+  const namedRegion = REGIONS.find((item) => item.id === generationName);
+  if (namedRegion) return namedRegion.filterLabel;
   const region = GENERATION_REGIONS[generationName];
   const roman = generationName.replace(/^generation-/, '').toUpperCase();
   if (!region) return `Gen ${roman}`;
@@ -290,6 +292,43 @@ function isRegionalFormName(pokemonName, speciesName, suffix) {
     pokemonName.startsWith(`${prefix}-`) ||
     pokemonName === `${speciesName}-totem-${suffix}`
   );
+}
+
+const GALAR_DEXES = new Set(['galar', 'isle-of-armor', 'crown-tundra']);
+
+export function regionIdFromPokemonName(pokemonName) {
+  if (!pokemonName) return null;
+  const name = String(pokemonName).toLowerCase();
+  if (name.includes('-cap')) return null;
+  const match = REGIONS.find((region) => {
+    const suffix = region.formSuffix;
+    if (!suffix) return false;
+    return (
+      name.endsWith(`-${suffix}`) ||
+      name.includes(`-${suffix}-`) ||
+      name.endsWith(`-totem-${suffix}`)
+    );
+  });
+  return match?.id ?? null;
+}
+
+function isHisuiSpecies(species) {
+  const dexes = new Set(
+    (species?.pokedex_numbers ?? []).map((entry) => entry.pokedex?.name),
+  );
+  if (!dexes.has('hisui')) return false;
+  return ![...GALAR_DEXES].some((name) => dexes.has(name));
+}
+
+export function resolvePokemonGeneration(pokemon, species) {
+  const formRegion = regionIdFromPokemonName(pokemon?.name);
+  if (formRegion) return formRegion;
+
+  const generationName = species?.generation?.name ?? null;
+  if (generationName === 'generation-viii' && isHisuiSpecies(species)) {
+    return 'hisui';
+  }
+  return generationName;
 }
 
 function toNameSet(names) {

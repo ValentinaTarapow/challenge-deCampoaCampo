@@ -12,6 +12,7 @@ import {
   parseVarieties,
   pokemonNamesForRegions,
   isDefaultPokemon,
+  resolvePokemonGeneration,
 } from './pokemon';
 
 jest.mock('./client', () => ({
@@ -44,8 +45,58 @@ describe('pokemon helpers', () => {
 
   it('labels a generation with its region', () => {
     expect(getGenerationLabel('generation-i')).toBe('Kanto (Gen I)');
+    expect(getGenerationLabel('generation-viii')).toBe('Galar (Gen VIII)');
+    expect(getGenerationLabel('hisui')).toBe('Hisui (Gen VIII)');
     expect(getGenerationLabel('generation-ix')).toBe('Paldea (Gen IX)');
     expect(getGenerationLabel(null)).toBeNull();
+  });
+
+  it('resolves Hisui separately from Galar for gen VIII species', () => {
+    expect(
+      resolvePokemonGeneration(
+        { name: 'kleavor' },
+        {
+          generation: { name: 'generation-viii' },
+          pokedex_numbers: [{ pokedex: { name: 'hisui' } }],
+        },
+      ),
+    ).toBe('hisui');
+    expect(
+      resolvePokemonGeneration(
+        { name: 'grookey' },
+        {
+          generation: { name: 'generation-viii' },
+          pokedex_numbers: [{ pokedex: { name: 'galar' } }],
+        },
+      ),
+    ).toBe('generation-viii');
+  });
+
+  it('labels regional forms by the form region, not the species generation', () => {
+    expect(
+      resolvePokemonGeneration(
+        { name: 'growlithe-hisui' },
+        { generation: { name: 'generation-i' } },
+      ),
+    ).toBe('hisui');
+    expect(
+      resolvePokemonGeneration(
+        { name: 'raichu-alola' },
+        { generation: { name: 'generation-i' } },
+      ),
+    ).toBe('alola');
+    expect(
+      resolvePokemonGeneration(
+        { name: 'growlithe' },
+        {
+          generation: { name: 'generation-i' },
+          pokedex_numbers: [
+            { pokedex: { name: 'kanto' } },
+            { pokedex: { name: 'hisui' } },
+          ],
+        },
+      ),
+    ).toBe('generation-i');
   });
 
   it('maps regional dex species to catalog form names', () => {

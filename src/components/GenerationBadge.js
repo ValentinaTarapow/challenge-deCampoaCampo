@@ -1,11 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { getGenerationLabel } from '../services/pokemon';
+import { REGIONS, getGenerationLabel } from '../services/pokemon';
 import { colors, onColor } from '../theme/colors';
 
 export function GenerationBadge({ generation }) {
   const label = getGenerationLabel(generation);
   if (!label) return null;
-  const backgroundColor = colors.generations[generation] || colors.textMuted;
+  const region = REGIONS.find((item) => item.id === generation);
+  const backgroundColor =
+    colors.generations[generation] ||
+    colors.generations[region?.generation] ||
+    colors.textMuted;
 
   return (
     <View style={[styles.badge, { backgroundColor }]}>
