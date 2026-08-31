@@ -78,7 +78,7 @@ export default function FavoritesScreen({ navigation }) {
               message="Tap the heart on a Pokémon to save it here. Favorites stay available offline."
             />
           ) : (
-            <PokemonGridSkeleton cardWidth={cardWidth} />
+            <PokemonGridSkeleton />
           )
         }
       />

@@ -522,7 +522,7 @@ export default function HomeScreen({ navigation }) {
 
           {showGridSkeleton ? (
             <View style={styles.listPane}>
-              <PokemonGridSkeleton cardWidth={cardWidth} />
+              <PokemonGridSkeleton />
             </View>
           ) : listError ? (
             <ErrorState

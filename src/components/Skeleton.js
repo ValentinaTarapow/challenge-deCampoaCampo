@@ -36,27 +36,45 @@ export function Skeleton({ width, height, radius = 8, style }) {
   );
 }
 
-export function PokemonCardSkeleton({ cardWidth }) {
-  const imageSize = Math.max(cardWidth - 24, 48);
-
+export function PokemonCardSkeleton() {
   return (
-    <View style={[styles.card, { width: cardWidth }]}>
-      <Skeleton width={imageSize} height={imageSize} radius={12} />
+    <View style={styles.card}>
+      <View style={styles.imageSlot}>
+        <Skeleton radius={12} style={styles.imageBone} />
+      </View>
       <Skeleton width={36} height={10} radius={4} />
-      <Skeleton width={Math.min(72, cardWidth - 20)} height={12} radius={4} />
+      <Skeleton width="70%" height={12} radius={4} />
     </View>
   );
 }
 
-export function PokemonGridSkeleton({ cardWidth, count = 12, gap = 10 }) {
+export function PokemonGridSkeleton({ count = 12, gap = 10, columns = 3 }) {
+  const rows = [];
+  for (let i = 0; i < count; i += columns) {
+    rows.push(
+      Array.from({ length: Math.min(columns, count - i) }, (_, col) => i + col),
+    );
+  }
+
   return (
     <View
       style={[styles.grid, { gap }]}
       accessibilityLabel="Loading Pokémon"
       accessibilityRole="progressbar"
     >
-      {Array.from({ length: count }, (_, index) => (
-        <PokemonCardSkeleton key={index} cardWidth={cardWidth} />
+      {rows.map((row, rowIndex) => (
+        <View key={rowIndex} style={[styles.gridRow, { gap }]}>
+          {row.map((index) => (
+            <View key={index} style={styles.gridCell}>
+              <PokemonCardSkeleton />
+            </View>
+          ))}
+          {row.length < columns
+            ? Array.from({ length: columns - row.length }, (_, pad) => (
+                <View key={`pad-${pad}`} style={styles.gridCell} />
+              ))
+            : null}
+        </View>
       ))}
     </View>
   );
@@ -113,8 +131,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.skeleton,
   },
   grid: {
+    width: '100%',
+  },
+  gridRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    width: '100%',
+  },
+  gridCell: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
   },
   card: {
     backgroundColor: colors.surface,
@@ -125,6 +152,15 @@ const styles = StyleSheet.create({
     gap: 8,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  imageSlot: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  imageBone: {
+    ...StyleSheet.absoluteFillObject,
   },
   abilityBlock: {
     gap: 8,
