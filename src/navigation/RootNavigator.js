@@ -23,7 +23,9 @@ function HeaderBackground() {
 }
 
 function Tabs() {
+  const insets = useSafeAreaInsets();
   const { favorites } = useFavorites();
+  const tabBarPadTop = 6;
 
   return (
     <Tab.Navigator
@@ -35,6 +37,12 @@ function Tabs() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
+          height: 49 + tabBarPadTop + insets.bottom,
+          paddingTop: tabBarPadTop,
+          paddingBottom: insets.bottom,
+        },
+        tabBarItemStyle: {
+          paddingTop: 2,
         },
         tabBarLabelStyle: {
           fontWeight: '700',
