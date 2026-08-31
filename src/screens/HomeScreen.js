@@ -30,7 +30,17 @@ const GRID_GAP = 10;
 const keyExtractor = (item) => String(item.id);
 
 function ListEmpty() {
-  return <Text style={styles.empty}>No Pokémon with that name</Text>;
+  return <Text style={styles.empty}>No Pokémon match that search</Text>;
+}
+
+function matchesSearch(item, term) {
+  if (term.startsWith('#')) {
+    const digits = term.slice(1);
+    if (!digits || !/^\d+$/.test(digits)) return false;
+    return String(Number(item.id)) === String(Number(digits));
+  }
+
+  return item.name.toLowerCase().includes(term);
 }
 
 function LoadMoreFooter({ loading, error, onRetry }) {
@@ -189,7 +199,7 @@ export default function HomeScreen({ navigation }) {
     const term = query.trim().toLowerCase();
     if (!term) return pokemon;
     const source = catalog.length ? catalog : pokemon;
-    return source.filter((item) => item.name.toLowerCase().includes(term));
+    return source.filter((item) => matchesSearch(item, term));
   }, [pokemon, catalog, query]);
 
   const onPressPokemon = useCallback(
@@ -227,7 +237,7 @@ export default function HomeScreen({ navigation }) {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search by name..."
+            placeholder="Search by name or #id..."
             placeholderTextColor={colors.textMuted}
             style={[styles.search, query.length > 0 && styles.searchWithClearRight]}
             autoCapitalize="none"
