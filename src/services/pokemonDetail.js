@@ -56,6 +56,16 @@ export function hasFullPokemon(pokemon) {
   return Boolean(pokemon?.stats?.length);
 }
 
+export function hasCompleteExtras(detail) {
+  return Boolean(
+    detail?.pokemon &&
+      detail.matchups != null &&
+      detail.evolution != null &&
+      detail.abilities != null &&
+      detail.varieties != null,
+  );
+}
+
 export function collectImageUrls({ pokemon, evolution, varieties }) {
   const ids = new Set([String(pokemon.id)]);
   (evolution?.stages ?? []).forEach((stage) => {

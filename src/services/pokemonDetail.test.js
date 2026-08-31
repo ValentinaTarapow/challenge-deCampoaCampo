@@ -8,6 +8,7 @@ import {
   buildDetail,
   collectImageUrls,
   getPokemonExtras,
+  hasCompleteExtras,
   hasFullPokemon,
   pickPokemon,
   toListItem,
@@ -55,6 +56,19 @@ describe('pokemonDetail', () => {
   it('detects a full Pokémon payload by stats', () => {
     expect(hasFullPokemon(pikachu)).toBe(true);
     expect(hasFullPokemon({ id: 25, name: 'pikachu' })).toBe(false);
+  });
+
+  it('treats a favorite as incomplete until extras are present', () => {
+    expect(hasCompleteExtras({ pokemon: pikachu })).toBe(false);
+    expect(
+      hasCompleteExtras({
+        pokemon: pikachu,
+        matchups: { weaknesses: [], resistances: [], immunities: [] },
+        evolution: { stages: [], linear: true, total: 0 },
+        abilities: [],
+        varieties: [],
+      }),
+    ).toBe(true);
   });
 
   it('normalizes a Pokémon for offline detail', () => {

@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { FavoritesProvider, useFavorites } from './FavoritesContext';
 import { getFavorites, saveFavorites } from '../services/storage';
 import { cacheImageUrls, deleteImageFiles } from '../services/imageCache';
+import { getPokemonDetailBundle, getPokemonExtras } from '../services/pokemonDetail';
 
 jest.mock('../services/storage', () => ({
   getFavorites: jest.fn(),
@@ -66,6 +67,8 @@ describe('FavoritesContext', () => {
   beforeEach(() => {
     getFavorites.mockResolvedValue([]);
     cacheImageUrls.mockResolvedValue(cachedImages);
+    getPokemonExtras.mockClear();
+    getPokemonDetailBundle.mockClear();
   });
 
   it('hydrates saved favorites on start', async () => {
@@ -83,6 +86,45 @@ describe('FavoritesContext', () => {
     await waitFor(() => {
       expect(result.current.favorites[0]?.detail?.pokemon?.name).toBe('pikachu');
     });
+  });
+
+  it('retries extras when a favorite was saved without them', async () => {
+    getFavorites.mockResolvedValue([
+      {
+        id: '25',
+        name: 'pikachu',
+        detail: {
+          pokemon: {
+            id: 25,
+            name: 'pikachu',
+            types: [{ type: { name: 'electric' } }],
+            stats: [{ stat: { name: 'hp' }, base_stat: 35 }],
+            height: 4,
+            weight: 60,
+            abilities: [{ is_hidden: false, ability: { name: 'static' } }],
+            species: { name: 'pikachu' },
+          },
+          matchups: null,
+          evolution: null,
+          abilities: null,
+          varieties: null,
+        },
+      },
+    ]);
+
+    const { result } = renderHook(() => useFavorites(), { wrapper });
+
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    await waitFor(() => {
+      expect(getPokemonExtras).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(result.current.favorites[0]?.detail?.matchups).toEqual({
+        weaknesses: ['ground'],
+        resistances: [],
+      });
+    });
+    expect(getPokemonDetailBundle).not.toHaveBeenCalled();
   });
 
   it('adds and removes a Pokémon from favorites', async () => {

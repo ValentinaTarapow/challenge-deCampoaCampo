@@ -15,6 +15,7 @@ import {
 import {
   buildDetail,
   collectImageUrls,
+  hasCompleteExtras,
   getPokemonDetailBundle,
   getPokemonExtras,
   hasFullPokemon,
@@ -143,15 +144,18 @@ export function FavoritesProvider({ children }) {
 
   const ensureFavoriteDetail = useCallback(
     async (pokemon) => {
+      const stored = pokemon?.detail?.pokemon;
+      const payload = hasFullPokemon(pokemon) ? pokemon : stored;
+
       try {
-        if (hasFullPokemon(pokemon)) {
+        if (hasFullPokemon(payload)) {
           let extras = {};
           try {
-            extras = await getPokemonExtras(pokemon);
+            extras = await getPokemonExtras(payload);
           } catch {
             extras = {};
           }
-          await persistFavoriteDetail({ pokemon, ...extras });
+          await persistFavoriteDetail({ pokemon: payload, ...extras });
           return;
         }
 
@@ -166,7 +170,9 @@ export function FavoritesProvider({ children }) {
 
   useEffect(() => {
     if (!ready) return undefined;
-    const pending = favoritesRef.current.filter((item) => !item.detail?.pokemon);
+    const pending = favoritesRef.current.filter(
+      (item) => !hasCompleteExtras(item.detail),
+    );
     pending.forEach((item) => {
       ensureFavoriteDetail(item);
     });
