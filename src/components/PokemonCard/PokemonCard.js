@@ -1,65 +1,68 @@
-import { createContext, useContext } from 'react';
+import { createContext, useCallback, useContext, useMemo } from 'react';
 import {
   View,
   Text,
-  Image,
   Pressable,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
 import { colors } from '../../theme/colors';
+import ProgressiveImage from './ProgressiveImage';
 
 const PokemonCardContext = createContext(null);
 
-function usePokemonCard() {
+function usePokemonCard(sectionName) {
   const context = useContext(PokemonCardContext);
   if (!context) {
-    throw new Error('PokemonCard compound parts must be used inside PokemonCard');
+    throw new Error(`${sectionName} must be rendered inside <PokemonCard>.`);
   }
   return context;
 }
 
 function PokemonCard({ pokemon, onPress, children, style }) {
+  const value = useMemo(() => ({ pokemon, onPress }), [pokemon, onPress]);
+  const pressableStyle = useCallback(
+    ({ pressed }) => [styles.card, pressed && styles.cardPressed, style],
+    [style],
+  );
+
   return (
-    <PokemonCardContext.Provider value={{ pokemon, onPress }}>
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [
-          styles.card,
-          pressed && styles.cardPressed,
-          style,
-        ]}
-      >
+    <PokemonCardContext.Provider value={value}>
+      <Pressable onPress={onPress} style={pressableStyle}>
         {children}
       </Pressable>
     </PokemonCardContext.Provider>
   );
 }
 
-function ImagePart({ style, size = 72 }) {
-  const { pokemon } = usePokemonCard();
+function ImageSection({ style, size = 80 }) {
+  const { pokemon } = usePokemonCard('PokemonCard.Image');
   return (
-    <Image
-      source={{ uri: pokemon.image }}
-      style={[{ width: size, height: size }, style]}
-      resizeMode="contain"
+    <ProgressiveImage
+      source={pokemon.image}
+      size={size}
+      style={style}
     />
   );
 }
 
-function Name({ style }) {
-  const { pokemon } = usePokemonCard();
-  return <Text style={[styles.name, style]}>{pokemon.name}</Text>;
+function Name({ style, numberOfLines = 1 }) {
+  const { pokemon } = usePokemonCard('PokemonCard.Name');
+  return (
+    <Text style={[styles.name, style]} numberOfLines={numberOfLines}>
+      {pokemon.name}
+    </Text>
+  );
 }
 
 function Id({ style }) {
-  const { pokemon } = usePokemonCard();
+  const { pokemon } = usePokemonCard('PokemonCard.Id');
   const id = String(pokemon.id).padStart(3, '0');
   return <Text style={[styles.id, style]}>#{id}</Text>;
 }
 
 function Types({ style }) {
-  const { pokemon } = usePokemonCard();
+  const { pokemon } = usePokemonCard('PokemonCard.Types');
   if (!pokemon.types?.length) return null;
 
   return (
@@ -83,7 +86,7 @@ function Content({ children, style }) {
   return <View style={[styles.content, style]}>{children}</View>;
 }
 
-PokemonCard.Image = ImagePart;
+PokemonCard.Image = ImageSection;
 PokemonCard.Name = Name;
 PokemonCard.Id = Id;
 PokemonCard.Types = Types;
@@ -93,10 +96,10 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: 16,
-    padding: 12,
-    flexDirection: 'row',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     alignItems: 'center',
-    gap: 12,
+    gap: 6,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -104,17 +107,19 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   content: {
-    flex: 1,
-    gap: 4,
+    width: '100%',
+    alignItems: 'center',
+    gap: 2,
   },
   name: {
-    fontSize: 18,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.text,
     textTransform: 'capitalize',
+    textAlign: 'center',
   },
   id: {
-    fontSize: 13,
+    fontSize: 11,
     color: colors.textMuted,
     fontWeight: '600',
   },

@@ -1,29 +1,59 @@
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  getPokemonCatalog,
   getPokemonIdFromUrl,
-  getPokemonImageUrl,
-  getPokemonList,
+  getPokemonSpriteUrl,
 } from '../services/pokemon';
 import { PokemonCard, LoadingState, ErrorState } from '../components/PokemonCard';
 import { colors } from '../theme/colors';
 
-const PAGE_SIZE = 20;
+const NUM_COLUMNS = 3;
+const LIST_PADDING = 16;
+const GRID_GAP = 10;
+
+const keyExtractor = (item) => String(item.id);
+
+function ListEmpty() {
+  return <Text style={styles.empty}>No hay Pokémon con ese nombre</Text>;
+}
+
+const PokemonGridItem = memo(function PokemonGridItem({
+  item,
+  cardWidth,
+  onPress,
+}) {
+  return (
+    <PokemonCard
+      pokemon={item}
+      style={{ width: cardWidth }}
+      onPress={() => onPress(item.name)}
+    >
+      <PokemonCard.Image size={cardWidth - 24} />
+      <PokemonCard.Content>
+        <PokemonCard.Id />
+        <PokemonCard.Name />
+      </PokemonCard.Content>
+    </PokemonCard>
+  );
+});
 
 export default function HomeScreen({ navigation }) {
+  const { width } = useWindowDimensions();
+  const cardWidth =
+    (width - LIST_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
+
   const [pokemon, setPokemon] = useState([]);
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
@@ -34,34 +64,28 @@ export default function HomeScreen({ navigation }) {
       return {
         id,
         name: item.name,
-        image: getPokemonImageUrl(id),
+        image: getPokemonSpriteUrl(id),
         types: [],
       };
     });
   }, []);
 
-  const fetchPage = useCallback(
-    async ({ nextOffset = 0, append = false } = {}) => {
-      const data = await getPokemonList(PAGE_SIZE, nextOffset);
-      const mapped = mapResults(data.results);
-      setPokemon((prev) => (append ? [...prev, ...mapped] : mapped));
-      setOffset(nextOffset + PAGE_SIZE);
-      setHasMore(Boolean(data.next));
-    },
-    [mapResults],
-  );
+  const loadCatalog = useCallback(async () => {
+    const data = await getPokemonCatalog();
+    setPokemon(mapResults(data.results));
+  }, [mapResults]);
 
   const loadInitial = useCallback(async () => {
     try {
       setError(null);
       setLoading(true);
-      await fetchPage({ nextOffset: 0, append: false });
+      await loadCatalog();
     } catch (err) {
       setError(err.message || 'No se pudo cargar la lista');
     } finally {
       setLoading(false);
     }
-  }, [fetchPage]);
+  }, [loadCatalog]);
 
   useEffect(() => {
     loadInitial();
@@ -71,7 +95,7 @@ export default function HomeScreen({ navigation }) {
     try {
       setRefreshing(true);
       setError(null);
-      await fetchPage({ nextOffset: 0, append: false });
+      await loadCatalog();
     } catch (err) {
       setError(err.message || 'No se pudo refrescar');
     } finally {
@@ -79,20 +103,28 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const onEndReached = async () => {
-    if (!hasMore || loadingMore || loading) return;
-    try {
-      setLoadingMore(true);
-      await fetchPage({ nextOffset: offset, append: true });
-    } catch (err) {
-      setError(err.message || 'No se pudo cargar más');
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+  const filtered = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return pokemon;
+    return pokemon.filter((item) => item.name.toLowerCase().includes(term));
+  }, [pokemon, query]);
 
-  const filtered = pokemon.filter((item) =>
-    item.name.toLowerCase().includes(query.trim().toLowerCase()),
+  const onPressPokemon = useCallback(
+    (name) => {
+      navigation.navigate('Detail', { nameOrId: name });
+    },
+    [navigation],
+  );
+
+  const renderItem = useCallback(
+    ({ item }) => (
+      <PokemonGridItem
+        item={item}
+        cardWidth={cardWidth}
+        onPress={onPressPokemon}
+      />
+    ),
+    [cardWidth, onPressPokemon],
   );
 
   if (loading) {
@@ -121,32 +153,20 @@ export default function HomeScreen({ navigation }) {
 
       <FlatList
         data={filtered}
-        keyExtractor={(item) => String(item.id)}
+        numColumns={NUM_COLUMNS}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
         contentContainerStyle={styles.list}
+        columnWrapperStyle={styles.row}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        onEndReached={onEndReached}
-        onEndReachedThreshold={0.4}
-        ListFooterComponent={
-          loadingMore ? <LoadingState message="Cargando más..." /> : null
-        }
-        renderItem={({ item }) => (
-          <PokemonCard
-            pokemon={item}
-            onPress={() =>
-              navigation.navigate('Detail', {
-                nameOrId: item.name,
-              })
-            }
-          >
-            <PokemonCard.Image />
-            <PokemonCard.Content>
-              <PokemonCard.Id />
-              <PokemonCard.Name />
-            </PokemonCard.Content>
-          </PokemonCard>
-        )}
+        initialNumToRender={12}
+        maxToRenderPerBatch={9}
+        windowSize={10}
+        removeClippedSubviews
+        ListEmptyComponent={ListEmpty}
       />
     </SafeAreaView>
   );
@@ -158,7 +178,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    paddingHorizontal: 16,
+    paddingHorizontal: LIST_PADDING,
     paddingBottom: 12,
     gap: 4,
   },
@@ -183,8 +203,17 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   list: {
-    padding: 16,
-    gap: 12,
+    paddingHorizontal: LIST_PADDING,
     paddingBottom: 32,
+  },
+  row: {
+    gap: GRID_GAP,
+    marginBottom: GRID_GAP,
+  },
+  empty: {
+    textAlign: 'center',
+    color: colors.textMuted,
+    marginTop: 32,
+    fontSize: 15,
   },
 });

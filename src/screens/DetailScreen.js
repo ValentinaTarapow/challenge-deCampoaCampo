@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   getPokemonByNameOrId,
   getPokemonImageUrl,
 } from '../services/pokemon';
 import { LoadingState, ErrorState } from '../components/PokemonCard';
+import ProgressiveImage from '../components/PokemonCard/ProgressiveImage';
 import { colors } from '../theme/colors';
 
 export default function DetailScreen({ route }) {
@@ -45,7 +46,7 @@ export default function DetailScreen({ route }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
-        <Image source={{ uri: image }} style={styles.image} resizeMode="contain" />
+        <ProgressiveImage source={image} size={180} />
         <Text style={styles.id}>#{String(pokemon.id).padStart(3, '0')}</Text>
         <Text style={styles.name}>{pokemon.name}</Text>
         <View style={styles.typesRow}>
@@ -108,10 +109,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  image: {
-    width: 180,
-    height: 180,
   },
   id: {
     marginTop: 8,
