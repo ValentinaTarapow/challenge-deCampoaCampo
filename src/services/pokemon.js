@@ -129,12 +129,14 @@ export function getPokemonIdFromUrl(url) {
   return parts[parts.length - 1];
 }
 
-export function getPokemonSpriteUrl(id) {
-  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+export function getPokemonSpriteUrl(id, { shiny = false } = {}) {
+  const path = shiny ? `shiny/${id}` : id;
+  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${path}.png`;
 }
 
-export function getPokemonImageUrl(id) {
-  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+export function getPokemonImageUrl(id, { shiny = false } = {}) {
+  const path = shiny ? `shiny/${id}` : id;
+  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${path}.png`;
 }
 
 const GENERATION_REGIONS = {

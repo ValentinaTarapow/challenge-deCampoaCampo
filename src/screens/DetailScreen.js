@@ -171,11 +171,11 @@ function MatchupSection({ title, tip, types, loaded, tipOpen, onToggleTip }) {
   );
 }
 
-function EvolutionNode({ pokemon, currentName, onPress }) {
+function EvolutionNode({ pokemon, currentName, onPress, shiny }) {
   const isCurrent = pokemon.name === currentName;
   const content = (
     <>
-      <RemoteImage source={getPokemonSpriteUrl(pokemon.id)} size={64} />
+      <RemoteImage source={getPokemonSpriteUrl(pokemon.id, { shiny })} size={64} />
       <Text style={styles.evoName} numberOfLines={1}>
         {pokemon.name}
       </Text>
@@ -206,11 +206,11 @@ function EvolutionNode({ pokemon, currentName, onPress }) {
   );
 }
 
-function FormCard({ pokemon, currentName, onPress }) {
+function FormCard({ pokemon, currentName, onPress, shiny }) {
   const isCurrent = pokemon.name === currentName;
   const content = (
     <>
-      <RemoteImage source={getPokemonSpriteUrl(pokemon.id)} size={52} />
+      <RemoteImage source={getPokemonSpriteUrl(pokemon.id, { shiny })} size={52} />
       <Text style={styles.formName} numberOfLines={2}>
         {pokemon.label}
       </Text>
@@ -231,7 +231,7 @@ function FormCard({ pokemon, currentName, onPress }) {
   );
 }
 
-function FormsModal({ visible, varieties, currentName, onClose, onPress }) {
+function FormsModal({ visible, varieties, currentName, onClose, onPress, shiny }) {
   return (
     <Modal
       visible={visible}
@@ -263,6 +263,7 @@ function FormsModal({ visible, varieties, currentName, onClose, onPress }) {
                 pokemon={item}
                 currentName={currentName}
                 onPress={onPress}
+                shiny={shiny}
               />
             ))}
           </ScrollView>
@@ -272,7 +273,7 @@ function FormsModal({ visible, varieties, currentName, onClose, onPress }) {
   );
 }
 
-function FormsSection({ varieties, currentName, onPress, onSeeAll }) {
+function FormsSection({ varieties, currentName, onPress, onSeeAll, shiny }) {
   if (!varieties || varieties.length <= 1) return null;
 
   const ordered = [
@@ -308,6 +309,7 @@ function FormsSection({ varieties, currentName, onPress, onSeeAll }) {
             pokemon={item}
             currentName={currentName}
             onPress={onPress}
+            shiny={shiny}
           />
         ))}
       </ScrollView>
@@ -315,7 +317,7 @@ function FormsSection({ varieties, currentName, onPress, onSeeAll }) {
   );
 }
 
-function EvolutionSection({ stages, total, currentName, onPress }) {
+function EvolutionSection({ stages, total, currentName, onPress, shiny }) {
   if (!stages) {
     return <ActivityIndicator color={colors.primary} />;
   }
@@ -336,6 +338,7 @@ function EvolutionSection({ stages, total, currentName, onPress }) {
                 pokemon={item}
                 currentName={currentName}
                 onPress={onPress}
+                shiny={shiny}
               />
             ))}
           </View>
@@ -358,6 +361,7 @@ export default function DetailScreen({ route, navigation }) {
   const [showWeaknessTip, setShowWeaknessTip] = useState(false);
   const [showResistanceTip, setShowResistanceTip] = useState(false);
   const [showFormsModal, setShowFormsModal] = useState(false);
+  const [shiny, setShiny] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -475,7 +479,7 @@ export default function DetailScreen({ route, navigation }) {
 
   const types = pokemon.types.map((entry) => entry.type.name);
   const stats = pokemon.stats;
-  const image = getPokemonImageUrl(pokemon.id);
+  const image = getPokemonImageUrl(pokemon.id, { shiny });
   const heightM = (pokemon.height / 10).toFixed(1);
   const weightKg = (pokemon.weight / 10).toFixed(1);
   const closeTips = () => {
@@ -498,6 +502,19 @@ export default function DetailScreen({ route, navigation }) {
             <GenerationBadge generation={generation} />
           </View>
         ) : null}
+        <Pressable
+          onPress={() => setShiny((on) => !on)}
+          style={[styles.shinyBtn, shiny && styles.shinyBtnOn]}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={shiny ? 'Show default sprite' : 'Show shiny sprite'}
+        >
+          <MaterialCommunityIcons
+            name={shiny ? 'star-four-points' : 'star-four-points-outline'}
+            size={18}
+            color={shiny ? colors.pokedex.yellow : colors.textMuted}
+          />
+        </Pressable>
         <RemoteImage source={image} size={168} />
         <Text style={styles.nameLine}>
           <Text style={styles.id}>#{String(pokemon.id).padStart(3, '0')} </Text>
@@ -574,6 +591,7 @@ export default function DetailScreen({ route, navigation }) {
           total={evolution?.total}
           currentName={pokemon.species?.name ?? pokemon.name}
           onPress={openPokemon}
+          shiny={shiny}
         />
       </View>
 
@@ -586,6 +604,7 @@ export default function DetailScreen({ route, navigation }) {
             closeTips();
             setShowFormsModal(true);
           }}
+          shiny={shiny}
         />
       ) : null}
 
@@ -612,6 +631,7 @@ export default function DetailScreen({ route, navigation }) {
           setShowFormsModal(false);
           openPokemon(name);
         }}
+        shiny={shiny}
       />
     </View>
   );
@@ -651,6 +671,24 @@ const styles = StyleSheet.create({
     left: 10,
     zIndex: 1,
     maxWidth: '70%',
+  },
+  shinyBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 1,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  shinyBtnOn: {
+    borderColor: colors.pokedex.yellow,
+    backgroundColor: '#FFF6D6',
   },
   headerBadge: {
     flexDirection: 'row',
