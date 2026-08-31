@@ -5,7 +5,7 @@ import {
   getPokemonImageUrl,
 } from '../services/pokemon';
 import { LoadingState, ErrorState } from '../components/PokemonCard';
-import ProgressiveImage from '../components/PokemonCard/ProgressiveImage';
+import RemoteImage from '../components/PokemonCard/RemoteImage';
 import { colors } from '../theme/colors';
 
 export default function DetailScreen({ route }) {
@@ -46,7 +46,7 @@ export default function DetailScreen({ route }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
-        <ProgressiveImage source={image} size={180} />
+        <RemoteImage source={image} size={180} />
         <Text style={styles.id}>#{String(pokemon.id).padStart(3, '0')}</Text>
         <Text style={styles.name}>{pokemon.name}</Text>
         <View style={styles.typesRow}>

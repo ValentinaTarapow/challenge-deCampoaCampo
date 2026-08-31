@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { colors } from '../../theme/colors';
-import ProgressiveImage from './ProgressiveImage';
+import RemoteImage from './RemoteImage';
 
 const PokemonCardContext = createContext(null);
 
@@ -38,7 +38,7 @@ function PokemonCard({ pokemon, onPress, children, style }) {
 function ImageSection({ style, size = 80 }) {
   const { pokemon } = usePokemonCard('PokemonCard.Image');
   return (
-    <ProgressiveImage
+    <RemoteImage
       source={pokemon.image}
       size={size}
       style={style}
