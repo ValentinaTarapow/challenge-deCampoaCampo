@@ -35,4 +35,12 @@ export const colors = {
     steel: '#B8B8D0',
     fairy: '#EE99AC',
   },
+  statTiers: {
+    veryLow: '#F34444',
+    low: '#FF7F0F',
+    medium: '#FFDD57',
+    good: '#A0E515',
+    high: '#23CD5E',
+    veryHigh: '#00C2B8',
+  },
 };

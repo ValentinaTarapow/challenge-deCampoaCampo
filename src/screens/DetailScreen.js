@@ -8,6 +8,53 @@ import { LoadingState, ErrorState } from '../components/states';
 import { RemoteImage } from '../components/PokemonCard';
 import { colors } from '../theme/colors';
 
+const STAT_MAX = 255;
+const STAT_SEGMENTS = 15;
+
+const STAT_LABELS = {
+  hp: 'HP',
+  attack: 'Attack',
+  defense: 'Defense',
+  'special-attack': 'Sp. Atk',
+  'special-defense': 'Sp. Def',
+  speed: 'Speed',
+};
+
+function colorForStat(value) {
+  if (value < 30) return colors.statTiers.veryLow;
+  if (value < 60) return colors.statTiers.low;
+  if (value < 90) return colors.statTiers.medium;
+  if (value < 120) return colors.statTiers.good;
+  if (value < 150) return colors.statTiers.high;
+  return colors.statTiers.veryHigh;
+}
+
+function StatRow({ name, value }) {
+  const filled = Math.round((value / STAT_MAX) * STAT_SEGMENTS);
+  const color = colorForStat(value);
+  const label = STAT_LABELS[name] || name;
+
+  return (
+    <View style={styles.statRow}>
+      <Text style={styles.statLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+      <View style={styles.dotRow}>
+        {Array.from({ length: STAT_SEGMENTS }, (_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.dot,
+              index < filled ? { backgroundColor: color } : styles.dotEmpty,
+            ]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function DetailScreen({ route }) {
   const { nameOrId } = route.params;
   const [pokemon, setPokemon] = useState(null);
@@ -73,20 +120,15 @@ export default function DetailScreen({ route }) {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Stats</Text>
-        {stats.map((stat) => (
-          <View key={stat.stat.name} style={styles.statRow}>
-            <Text style={styles.statName}>{stat.stat.name}</Text>
-            <View style={styles.barTrack}>
-              <View
-                style={[
-                  styles.barFill,
-                  { width: `${Math.min(stat.base_stat, 100)}%` },
-                ]}
-              />
-            </View>
-            <Text style={styles.statValue}>{stat.base_stat}</Text>
-          </View>
-        ))}
+        <View style={styles.statsList}>
+          {stats.map((stat) => (
+            <StatRow
+              key={stat.stat.name}
+              name={stat.stat.name}
+              value={stat.base_stat}
+            />
+          ))}
+        </View>
       </View>
     </ScrollView>
   );
@@ -153,32 +195,38 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 15,
   },
+  statsList: {
+    gap: 10,
+    marginTop: 4,
+  },
   statRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
-  statName: {
-    width: 90,
+  statLabel: {
+    width: 64,
     fontSize: 12,
-    color: colors.textMuted,
-    textTransform: 'capitalize',
-  },
-  barTrack: {
-    flex: 1,
-    height: 8,
-    backgroundColor: colors.border,
-    borderRadius: 999,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-  },
-  statValue: {
-    width: 32,
-    textAlign: 'right',
     fontWeight: '700',
     color: colors.text,
+  },
+  statValue: {
+    width: 28,
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  dotRow: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 3,
+  },
+  dot: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+  },
+  dotEmpty: {
+    backgroundColor: colors.border,
   },
 });
