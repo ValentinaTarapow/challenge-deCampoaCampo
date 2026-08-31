@@ -697,6 +697,18 @@ export default function DetailScreen({ route, navigation }) {
         />
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Dimensions</Text>
+        <View style={styles.dimensionRow}>
+          <Text style={styles.dimensionLabel}>Height</Text>
+          <Text style={styles.dimensionValue}>~ {heightM} m</Text>
+        </View>
+        <View style={styles.dimensionRow}>
+          <Text style={styles.dimensionLabel}>Weight</Text>
+          <Text style={styles.dimensionValue}>~ {weightKg} kg</Text>
+        </View>
+      </View>
+
       {varieties && varieties.length > 1 ? (
         <FormsSection
           varieties={varieties}
@@ -709,12 +721,6 @@ export default function DetailScreen({ route, navigation }) {
           shiny={shiny}
         />
       ) : null}
-
-      <View style={styles.sizeSection}>
-        <Text style={styles.sizeLine}>Height {heightM} m</Text>
-        <Text style={styles.sizeSep}>·</Text>
-        <Text style={styles.sizeLine}>Weight {weightKg} kg</Text>
-      </View>
     </ScrollView>
       {anyTipOpen ? (
         <Pressable
@@ -1189,20 +1195,20 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
     textAlign: 'center',
   },
-  sizeSection: {
+  dimensionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 4,
+    justifyContent: 'space-between',
+    paddingTop: 4,
   },
-  sizeLine: {
-    fontSize: 12,
-    fontWeight: '500',
+  dimensionLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  dimensionValue: {
+    fontSize: 15,
+    fontWeight: '600',
     color: colors.textMuted,
-  },
-  sizeSep: {
-    fontSize: 12,
-    color: colors.border,
   },
 });
