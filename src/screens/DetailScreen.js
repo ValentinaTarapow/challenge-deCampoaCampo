@@ -25,8 +25,8 @@ import { RemoteImage } from '../components/PokemonCard';
 import { TypeBadge } from '../components/TypeBadge';
 import { GenerationBadge } from '../components/GenerationBadge';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFavorites } from '../context/FavoritesContext';
+import { HeaderDropShadow } from '../components/HeaderDropShadow';
 import { colors } from '../theme/colors';
 
 const STAT_MAX = 255;
@@ -591,7 +591,7 @@ export default function DetailScreen({ route, navigation }) {
     return (
       <View style={styles.container}>
         <DetailScreenSkeleton />
-        <SafeAreaView edges={['bottom']} style={styles.bottomSafe} />
+        <HeaderDropShadow />
       </View>
     );
   }
@@ -608,7 +608,7 @@ export default function DetailScreen({ route, navigation }) {
           message={display.message}
           onRetry={load}
         />
-        <SafeAreaView edges={['bottom']} style={styles.bottomSafe} />
+        <HeaderDropShadow />
       </View>
     );
   }
@@ -804,7 +804,7 @@ export default function DetailScreen({ route, navigation }) {
         }}
         shiny={shiny}
       />
-      <SafeAreaView edges={['bottom']} style={styles.bottomSafe} />
+      <HeaderDropShadow />
     </View>
   );
 }
@@ -813,9 +813,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  bottomSafe: {
-    backgroundColor: colors.safeBottom,
   },
   scroll: {
     flex: 1,

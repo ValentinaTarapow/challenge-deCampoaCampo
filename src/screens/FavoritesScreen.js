@@ -9,6 +9,7 @@ import {
 import { PokemonGridItem } from '../components/PokemonGridItem';
 import { PokemonGridSkeleton } from '../components/Skeleton';
 import { Screen } from '../components/Screen';
+import { HeaderDropShadow } from '../components/HeaderDropShadow';
 import { EmptyState } from '../components/states';
 import { useFavorites } from '../context/FavoritesContext';
 import { colors } from '../theme/colors';
@@ -56,6 +57,7 @@ export default function FavoritesScreen({ navigation }) {
               ? `${favorites.length} saved · available offline`
               : 'Your saved Pokémon'}
         </Text>
+        <HeaderDropShadow edge="bottom" />
       </View>
       <FlatList
         data={listData}
@@ -91,6 +93,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     alignItems: 'center',
     gap: 4,
+    zIndex: 2,
+    backgroundColor: colors.background,
   },
   title: {
     fontSize: 28,
@@ -106,6 +110,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: LIST_PADDING,
+    paddingTop: 16,
     paddingBottom: 32,
     flexGrow: 1,
   },

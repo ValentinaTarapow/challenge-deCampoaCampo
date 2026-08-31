@@ -32,6 +32,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PokemonGridItem } from '../components/PokemonGridItem';
 import { PokemonGridSkeleton } from '../components/Skeleton';
 import { Screen } from '../components/Screen';
+import { HeaderDropShadow } from '../components/HeaderDropShadow';
 import { ErrorState } from '../components/states';
 import {
   EMPTY_FILTERS,
@@ -41,6 +42,7 @@ import {
   normalizeFilters,
 } from '../components/FilterSheet';
 import { describeError } from '../services/errors';
+import { matchesSearch } from '../utils/search';
 import { colors } from '../theme/colors';
 
 const PAGE_SIZE = 24;
@@ -97,16 +99,6 @@ async function unionNameSets(ids, loader) {
     set.forEach((name) => names.add(name));
   });
   return names;
-}
-
-function matchesSearch(item, term) {
-  if (term.startsWith('#')) {
-    const digits = term.slice(1);
-    if (!digits || !/^\d+$/.test(digits)) return false;
-    return String(Number(item.id)) === String(Number(digits));
-  }
-
-  return item.name.toLowerCase().includes(term);
 }
 
 function LoadMoreFooter({ loading, error, onRetry }) {
@@ -497,6 +489,7 @@ export default function HomeScreen({ navigation }) {
               </Pressable>
             </View>
           ) : null}
+          <HeaderDropShadow edge="bottom" />
           </View>
 
           <FilterSheet
@@ -567,6 +560,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     alignItems: 'center',
     gap: 8,
+    zIndex: 2,
+    backgroundColor: colors.background,
   },
   logo: {
     width: 180,
@@ -704,9 +699,11 @@ const styles = StyleSheet.create({
   listPane: {
     flex: 1,
     paddingHorizontal: LIST_PADDING,
+    paddingTop: 16,
   },
   listContent: {
     paddingHorizontal: LIST_PADDING,
+    paddingTop: 16,
     paddingBottom: 32,
     flexGrow: 1,
   },
