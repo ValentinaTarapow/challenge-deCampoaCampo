@@ -44,7 +44,7 @@ export default function SplashScreen({ onFinish }) {
         <View style={styles.divider} />
 
         <View style={styles.titleBlock}>
-          <Text style={styles.title}>Pokedex</Text>
+          <Text style={styles.title}>Pokédex</Text>
           <Text style={styles.subtitle}>Valentina Tarapow</Text>
         </View>
       </Pressable>
