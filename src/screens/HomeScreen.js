@@ -147,6 +147,8 @@ export default function HomeScreen({ navigation }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterRetry, setFilterRetry] = useState(0);
   const [fromCache, setFromCache] = useState(false);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState(null);
   const loadingMoreRef = useRef(false);
   const offsetRef = useRef(0);
   const pokemonRef = useRef([]);
@@ -203,13 +205,27 @@ export default function HomeScreen({ navigation }) {
   );
 
   const loadCatalog = useCallback(async () => {
+    setCatalogError(null);
     const cached = await getCachedCatalog();
-    if (cached.length) setCatalog(cached);
+    if (cached.length) {
+      setCatalog(cached);
+      setCatalogLoading(false);
+    } else {
+      setCatalogLoading(true);
+    }
 
-    const data = await getPokemonCatalog();
-    const mapped = mapResults(data.results);
-    setCatalog(mapped);
-    saveCachedCatalog(mapped).catch(() => {});
+    try {
+      const data = await getPokemonCatalog();
+      const mapped = mapResults(data.results);
+      setCatalog(mapped);
+      saveCachedCatalog(mapped).catch(() => {});
+    } catch (err) {
+      if (!cached.length) {
+        setCatalogError(describeError(err, 'list'));
+      }
+    } finally {
+      setCatalogLoading(false);
+    }
   }, [mapResults]);
 
   const loadInitial = useCallback(async () => {
@@ -351,11 +367,10 @@ export default function HomeScreen({ navigation }) {
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (!term && !hasFilters) return pokemon.filter(isDefaultPokemon);
-    const source = catalog.length ? catalog : pokemon;
     const regionNames = activeSets?.regions
       ? pokemonNamesForRegions(activeSets.regions, catalogNames)
       : null;
-    return source.filter((item) => {
+    return catalog.filter((item) => {
       if (activeSets?.type && !activeSets.type.has(item.name)) return false;
       if (regionNames && !regionNames.has(item.name)) return false;
       if (!isDefaultPokemon(item) && !regionNames?.has(item.name)) return false;
@@ -364,10 +379,15 @@ export default function HomeScreen({ navigation }) {
     });
   }, [pokemon, catalog, catalogNames, query, hasFilters, activeSets]);
 
+  const catalogPending = isFilteredView && catalog.length === 0 && catalogLoading;
+  const catalogFailed =
+    isFilteredView && catalog.length === 0 && catalogError ? catalogError : null;
   const showGridSkeleton =
     loading ||
+    catalogPending ||
     (!filterError && hasFilters && (filterLoading || !activeSets));
-  const listError = filterError || (error && pokemon.length === 0 ? error : null);
+  const listError =
+    filterError || catalogFailed || (error && pokemon.length === 0 ? error : null);
   const listData = showGridSkeleton || listError ? [] : filtered;
   const showEmpty = !showGridSkeleton && !listError && listData.length === 0;
 
@@ -536,7 +556,9 @@ export default function HomeScreen({ navigation }) {
               onRetry={
                 filterError
                   ? () => setFilterRetry((n) => n + 1)
-                  : loadInitial
+                  : catalogFailed
+                    ? loadCatalog
+                    : loadInitial
               }
             />
           ) : showEmpty ? (

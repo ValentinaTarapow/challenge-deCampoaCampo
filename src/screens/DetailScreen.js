@@ -28,6 +28,7 @@ export default function DetailScreen({ route, navigation }) {
   const [error, setError] = useState(null);
   const [extrasError, setExtrasError] = useState(null);
   const [extrasRetry, setExtrasRetry] = useState(0);
+  const [loadRetry, setLoadRetry] = useState(0);
   const [fromCache, setFromCache] = useState(false);
   const [shiny, setShiny] = useState(false);
 
@@ -40,7 +41,12 @@ export default function DetailScreen({ route, navigation }) {
     setAbilities(detail.abilities);
   }, []);
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    setShiny(false);
+  }, [nameOrId, paramId]);
+
+  useEffect(() => {
+    let cancelled = false;
     const cached = getFavorite(paramId) || getFavorite(nameOrId);
     const detail = cached?.detail;
 
@@ -49,7 +55,7 @@ export default function DetailScreen({ route, navigation }) {
 
     if (detail?.pokemon) {
       applySnapshot(detail);
-      setFromCache(true);
+      setFromCache(false);
       setLoading(false);
     } else {
       setPokemon(null);
@@ -62,23 +68,31 @@ export default function DetailScreen({ route, navigation }) {
       setLoading(true);
     }
 
-    try {
-      const data = await getPokemonByNameOrId(nameOrId);
-      setPokemon(data);
-      setFromCache(false);
-    } catch (err) {
-      if (!detail?.pokemon) {
-        setPokemon(null);
-        setError(describeError(err, 'detail', { query: nameOrId }));
+    async function loadLive() {
+      try {
+        const data = await getPokemonByNameOrId(nameOrId);
+        if (cancelled) return;
+        setPokemon(data);
+        setFromCache(false);
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        if (detail?.pokemon) {
+          setFromCache(true);
+        } else {
+          setPokemon(null);
+          setError(describeError(err, 'detail', { query: nameOrId }));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } finally {
-      setLoading(false);
     }
-  }, [applySnapshot, getFavorite, nameOrId, paramId]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+    loadLive();
+    return () => {
+      cancelled = true;
+    };
+  }, [applySnapshot, getFavorite, nameOrId, paramId, loadRetry]);
 
   useLayoutEffect(() => {
     const id = pokemon?.id ?? paramId;
@@ -208,7 +222,7 @@ export default function DetailScreen({ route, navigation }) {
           kind={display.kind}
           title={display.title}
           message={display.message}
-          onRetry={load}
+          onRetry={() => setLoadRetry((n) => n + 1)}
         />
         <HeaderDropShadow />
       </View>
