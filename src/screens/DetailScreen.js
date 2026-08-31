@@ -318,6 +318,24 @@ function FormsSection({ varieties, currentName, onPress, onSeeAll, shiny }) {
   );
 }
 
+const EVO_BRANCH_COLS = 3;
+
+function EvolutionStageNodes({ stage, currentName, onPress, shiny }) {
+  return (
+    <View style={stage.length > 1 ? styles.evoBranch : undefined}>
+      {stage.map((item) => (
+        <EvolutionNode
+          key={item.id}
+          pokemon={item}
+          currentName={currentName}
+          onPress={onPress}
+          shiny={shiny}
+        />
+      ))}
+    </View>
+  );
+}
+
 function EvolutionSection({ stages, total, currentName, onPress, shiny }) {
   if (!stages) {
     return <ActivityIndicator color={colors.primary} />;
@@ -327,22 +345,37 @@ function EvolutionSection({ stages, total, currentName, onPress, shiny }) {
     return <Text style={styles.meta}>This Pokémon does not evolve</Text>;
   }
 
+  const branched = stages.some((stage) => stage.length > 1);
+
+  if (branched) {
+    return (
+      <View style={styles.evoTreeBranched}>
+        {stages.map((stage, index) => (
+          <View key={stage.map((item) => item.id).join('-')} style={styles.evoTreeItemBranched}>
+            {index > 0 ? <Text style={styles.evoArrowDown}>↓</Text> : null}
+            <EvolutionStageNodes
+              stage={stage}
+              currentName={currentName}
+              onPress={onPress}
+              shiny={shiny}
+            />
+          </View>
+        ))}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.evoTree}>
       {stages.map((stage, index) => (
         <View key={stage.map((item) => item.id).join('-')} style={styles.evoTreeItem}>
           {index > 0 ? <Text style={styles.evoArrow}>→</Text> : null}
-          <View style={stage.length > 1 ? styles.evoColumn : undefined}>
-            {stage.map((item) => (
-              <EvolutionNode
-                key={item.id}
-                pokemon={item}
-                currentName={currentName}
-                onPress={onPress}
-                shiny={shiny}
-              />
-            ))}
-          </View>
+          <EvolutionStageNodes
+            stage={stage}
+            currentName={currentName}
+            onPress={onPress}
+            shiny={shiny}
+          />
         </View>
       ))}
     </View>
@@ -926,8 +959,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  evoTreeBranched: {
+    alignItems: 'center',
+    gap: 4,
+  },
   evoTreeItem: {
     flexDirection: 'row',
+    alignItems: 'center',
+  },
+  evoTreeItemBranched: {
     alignItems: 'center',
   },
   evoArrow: {
@@ -936,9 +976,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
-  evoColumn: {
-    flexDirection: 'column',
-    alignItems: 'center',
+  evoArrowDown: {
+    marginVertical: 2,
+    color: colors.textMuted,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  evoBranch: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    maxWidth: 84 * EVO_BRANCH_COLS + 8 * (EVO_BRANCH_COLS - 1),
     gap: 8,
   },
   evoNode: {
