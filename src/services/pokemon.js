@@ -188,19 +188,33 @@ export const REGIONS = [
     generation: 'generation-vi',
     pokedexes: ['kalos-central', 'kalos-coastal', 'kalos-mountain'],
   },
-  { id: 'alola', label: 'Alola', generation: 'generation-vii', pokedexes: ['original-alola'] },
+  {
+    id: 'alola',
+    label: 'Alola',
+    generation: 'generation-vii',
+    pokedexes: ['original-alola'],
+    formSuffix: 'alola',
+  },
   {
     id: 'galar',
     label: 'Galar',
     generation: 'generation-viii',
     pokedexes: ['galar', 'isle-of-armor', 'crown-tundra'],
+    formSuffix: 'galar',
   },
-  { id: 'hisui', label: 'Hisui', generation: 'generation-viii', pokedexes: ['hisui'] },
+  {
+    id: 'hisui',
+    label: 'Hisui',
+    generation: 'generation-viii',
+    pokedexes: ['hisui'],
+    formSuffix: 'hisui',
+  },
   {
     id: 'paldea',
     label: 'Paldea',
     generation: 'generation-ix',
     pokedexes: ['paldea', 'kitakami', 'blueberry'],
+    formSuffix: 'paldea',
   },
 ].map((region) => ({
   ...region,
@@ -260,4 +274,60 @@ export async function getPokemonNamesByRegion(regionId) {
     });
     return names;
   });
+}
+
+function isRegionalFormName(pokemonName, speciesName, suffix) {
+  if (!suffix || pokemonName.includes('-cap')) return false;
+  const prefix = `${speciesName}-${suffix}`;
+  return (
+    pokemonName === prefix ||
+    pokemonName.startsWith(`${prefix}-`) ||
+    pokemonName === `${speciesName}-totem-${suffix}`
+  );
+}
+
+function toNameSet(names) {
+  if (!names) return new Set();
+  if (names instanceof Set) return names;
+  return new Set(names);
+}
+
+export function expandRegionPokemonNames(speciesNames, regionId, catalogNames) {
+  const suffix = REGIONS.find((item) => item.id === regionId)?.formSuffix;
+  const catalog = toNameSet(catalogNames);
+  const result = new Set();
+
+  toNameSet(speciesNames).forEach((species) => {
+    if (!suffix) {
+      result.add(species);
+      return;
+    }
+
+    if (catalog.size) {
+      let found = false;
+      catalog.forEach((name) => {
+        if (isRegionalFormName(name, species, suffix)) {
+          result.add(name);
+          found = true;
+        }
+      });
+      if (found) return;
+    } else {
+      result.add(`${species}-${suffix}`);
+    }
+
+    result.add(species);
+  });
+
+  return result;
+}
+
+export function pokemonNamesForRegions(regionEntries, catalogNames) {
+  const names = new Set();
+  (regionEntries ?? []).forEach(({ id, species }) => {
+    expandRegionPokemonNames(species, id, catalogNames).forEach((name) => {
+      names.add(name);
+    });
+  });
+  return names;
 }

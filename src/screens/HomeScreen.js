@@ -21,6 +21,7 @@ import {
   getPokemonNamesByRegion,
   getPokemonNamesByType,
   getPokemonSpriteUrl,
+  pokemonNamesForRegions,
 } from '../services/pokemon';
 import {
   getCachedCatalog,
@@ -280,15 +281,22 @@ export default function HomeScreen({ navigation }) {
       try {
         setFilterLoading(true);
         setFilterError(null);
-        const [typeNames, regionNames] = await Promise.all([
+        const [typeNames, regionEntries] = await Promise.all([
           unionNameSets(activeFilters.types, getPokemonNamesByType),
-          unionNameSets(activeFilters.regions, getPokemonNamesByRegion),
+          activeFilters.regions.length
+            ? Promise.all(
+                activeFilters.regions.map(async (id) => ({
+                  id,
+                  species: await getPokemonNamesByRegion(id),
+                })),
+              )
+            : null,
         ]);
         if (!cancelled) {
           setFilterSets({
             key: filterKey,
             type: typeNames,
-            region: regionNames,
+            regions: regionEntries,
           });
         }
       } catch (err) {
@@ -331,17 +339,25 @@ export default function HomeScreen({ navigation }) {
 
   const activeSets = filterSets?.key === filterKey ? filterSets : null;
 
+  const catalogNames = useMemo(
+    () => catalog.map((item) => item.name),
+    [catalog],
+  );
+
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (!term && !hasFilters) return pokemon;
     const source = catalog.length ? catalog : pokemon;
+    const regionNames = activeSets?.regions
+      ? pokemonNamesForRegions(activeSets.regions, catalogNames)
+      : null;
     return source.filter((item) => {
       if (activeSets?.type && !activeSets.type.has(item.name)) return false;
-      if (activeSets?.region && !activeSets.region.has(item.name)) return false;
+      if (regionNames && !regionNames.has(item.name)) return false;
       if (term && !matchesSearch(item, term)) return false;
       return true;
     });
-  }, [pokemon, catalog, query, hasFilters, activeSets]);
+  }, [pokemon, catalog, catalogNames, query, hasFilters, activeSets]);
 
   const showGridSkeleton =
     loading ||

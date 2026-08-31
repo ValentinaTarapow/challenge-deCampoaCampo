@@ -1,5 +1,6 @@
 import { apiClient } from './client';
 import {
+  expandRegionPokemonNames,
   getGenerationLabel,
   getPokemonByNameOrId,
   getPokemonIdFromUrl,
@@ -9,6 +10,7 @@ import {
   parseAbilityInfo,
   parseEvolutionStages,
   parseVarieties,
+  pokemonNamesForRegions,
 } from './pokemon';
 
 jest.mock('./client', () => ({
@@ -36,6 +38,59 @@ describe('pokemon helpers', () => {
     expect(getGenerationLabel('generation-i')).toBe('Kanto (Gen I)');
     expect(getGenerationLabel('generation-ix')).toBe('Paldea (Gen IX)');
     expect(getGenerationLabel(null)).toBeNull();
+  });
+
+  it('maps regional dex species to catalog form names', () => {
+    const catalog = [
+      'rattata',
+      'rattata-alola',
+      'rowlet',
+      'mr-mime',
+      'mr-mime-galar',
+      'growlithe',
+      'growlithe-hisui',
+      'tauros',
+      'tauros-paldea-combat-breed',
+      'pikachu',
+      'pikachu-alola-cap',
+    ];
+
+    expect(
+      [...expandRegionPokemonNames(['rattata', 'rowlet'], 'alola', catalog)].sort(),
+    ).toEqual(['rattata-alola', 'rowlet']);
+    expect(
+      [...expandRegionPokemonNames(['mr-mime'], 'galar', catalog)],
+    ).toEqual(['mr-mime-galar']);
+    expect(
+      [...expandRegionPokemonNames(['growlithe'], 'hisui', catalog)],
+    ).toEqual(['growlithe-hisui']);
+    expect(
+      [...expandRegionPokemonNames(['tauros'], 'paldea', catalog)],
+    ).toEqual(['tauros-paldea-combat-breed']);
+    expect(
+      [...expandRegionPokemonNames(['rattata'], 'kanto', catalog)],
+    ).toEqual(['rattata']);
+    expect(
+      [...expandRegionPokemonNames(['pikachu'], 'alola', catalog)],
+    ).toEqual(['pikachu']);
+  });
+
+  it('unions expanded names when several regions are selected', () => {
+    const names = pokemonNamesForRegions(
+      [
+        { id: 'kanto', species: new Set(['rattata']) },
+        { id: 'alola', species: new Set(['rattata']) },
+      ],
+      ['rattata', 'rattata-alola'],
+    );
+
+    expect([...names].sort()).toEqual(['rattata', 'rattata-alola']);
+  });
+
+  it('guesses the regional form name before the catalog loads', () => {
+    expect([...expandRegionPokemonNames(['rattata'], 'alola', [])].sort()).toEqual(
+      ['rattata', 'rattata-alola'],
+    );
   });
 
   it('parses a linear evolution chain', () => {
