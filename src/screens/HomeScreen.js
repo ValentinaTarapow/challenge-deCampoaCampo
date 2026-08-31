@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -28,6 +29,27 @@ const keyExtractor = (item) => String(item.id);
 
 function ListEmpty() {
   return <Text style={styles.empty}>No hay Pokémon con ese nombre</Text>;
+}
+
+function LoadMoreFooter({ loading, error, onRetry }) {
+  if (loading) {
+    return (
+      <View style={styles.footer}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!error) return null;
+
+  return (
+    <View style={styles.footer}>
+      <Text style={styles.footerError}>{error}</Text>
+      <Pressable onPress={onRetry} style={styles.footerRetry}>
+        <Text style={styles.footerRetryText}>Reintentar</Text>
+      </Pressable>
+    </View>
+  );
 }
 
 const PokemonGridItem = memo(function PokemonGridItem({
@@ -62,6 +84,7 @@ export default function HomeScreen({ navigation }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [loadMoreError, setLoadMoreError] = useState(null);
   const [query, setQuery] = useState('');
   const loadingMoreRef = useRef(false);
   const offsetRef = useRef(0);
@@ -104,6 +127,7 @@ export default function HomeScreen({ navigation }) {
   const loadInitial = useCallback(async () => {
     try {
       setError(null);
+      setLoadMoreError(null);
       setLoading(true);
       offsetRef.current = 0;
       await fetchPage({ nextOffset: 0, append: false });
@@ -126,6 +150,7 @@ export default function HomeScreen({ navigation }) {
     try {
       setRefreshing(true);
       setError(null);
+      setLoadMoreError(null);
       offsetRef.current = 0;
       await fetchPage({ nextOffset: 0, append: false });
       loadCatalog().catch(() => {});
@@ -136,21 +161,27 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const onEndReached = useCallback(async () => {
+  const loadMore = useCallback(async () => {
     if (isSearching || !hasMore || loadingMoreRef.current || loading || refreshing) {
       return;
     }
     loadingMoreRef.current = true;
     try {
       setLoadingMore(true);
+      setLoadMoreError(null);
       await fetchPage({ nextOffset: offsetRef.current, append: true });
     } catch (err) {
-      setError(err.message || 'No se pudo cargar más');
+      setLoadMoreError(err.message || 'No se pudo cargar más');
     } finally {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
   }, [fetchPage, hasMore, isSearching, loading, refreshing]);
+
+  const onEndReached = useCallback(() => {
+    if (loadMoreError) return;
+    loadMore();
+  }, [loadMore, loadMoreError]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -220,11 +251,13 @@ export default function HomeScreen({ navigation }) {
         removeClippedSubviews
         ListEmptyComponent={ListEmpty}
         ListFooterComponent={
-          loadingMore && !isSearching ? (
-            <View style={styles.footer}>
-              <ActivityIndicator color={colors.primary} />
-            </View>
-          ) : null
+          isSearching ? null : (
+            <LoadMoreFooter
+              loading={loadingMore}
+              error={loadMoreError}
+              onRetry={loadMore}
+            />
+          )
         }
       />
     </SafeAreaView>
@@ -272,6 +305,23 @@ const styles = StyleSheet.create({
   footer: {
     paddingVertical: 16,
     alignItems: 'center',
+    gap: 10,
+  },
+  footerError: {
+    color: colors.textMuted,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  footerRetry: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  footerRetryText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
   },
   empty: {
     textAlign: 'center',
